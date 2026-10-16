@@ -1,11 +1,14 @@
 // Dónde se guardan grupos, jugadores e intentos.
-// Con firebaseConfig: Firestore + login anónimo (cada celular es un jugador).
+// Con firebaseConfig: Firestore + login anónimo (cada celular es un jugador), que se puede
+// asociar a una cuenta de Google para no perderlo al cambiar de celular.
 // Sin config: modo prueba con localStorage, solo en este dispositivo.
 //
 // Estructura (igual en los dos modos):
 //   groups/{gid}                 { name, owner, ownerName, status, round, startDay, schedule[] }
 //   groups/{gid}/members/{uid}   { name }
 //   groups/{gid}/plays/{uid_round_day}  { uid, round, day, used, changuis, scores[], best }
+// Solo Firebase:
+//   users/{uid}                  { name, groups[] }  para recuperar todo al entrar con Google
 
 import { firebaseConfig } from './firebase-config.js';
 import { ATTEMPTS, applyResult, emptyPlay } from './tournament.js';
@@ -35,7 +38,7 @@ async function firebaseAdapter(config) {
     import(`https://www.gstatic.com/firebasejs/${FB}/firebase-auth.js`),
     import(`https://www.gstatic.com/firebasejs/${FB}/firebase-firestore.js`),
   ]);
-  const { getAuth, signInAnonymously, onAuthStateChanged } = authMod;
+  const { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, linkWithPopup, signInWithCredential } = authMod;
   const { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, runTransaction, serverTimestamp } = fs;
 
   const app = initializeApp(config);
@@ -47,10 +50,40 @@ async function firebaseAdapter(config) {
     });
   });
   const uid = user.uid;
+  const googleEmail = u => (u.providerData.find(p => p.providerId === 'google.com') || {}).email || u.email || '';
+  const account = { google: !user.isAnonymous, email: googleEmail(user) };
 
   return {
     mode: 'firebase',
     uid,
+    account,
+    // Asocia este jugador a una cuenta de Google (mismo uid, no se pierde nada).
+    // Si esa cuenta ya estaba asociada a otro jugador, tira code 'cuenta-usada' con la credencial
+    // para entrar con ella usando useGoogle(); eso cambia de uid y hay que recargar la app.
+    async linkGoogle() {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      try {
+        const r = await linkWithPopup(auth.currentUser, provider);
+        account.google = true;
+        account.email = googleEmail(r.user);
+      } catch (e) {
+        if (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use') {
+          throw Object.assign(new Error('Esa cuenta de Google ya tiene un jugador.'), { code: 'cuenta-usada', credential: GoogleAuthProvider.credentialFromError(e) });
+        }
+        throw e;
+      }
+    },
+    async useGoogle(credential) {
+      await signInWithCredential(auth, credential);
+    },
+    async loadProfile() {
+      const s = await getDoc(doc(db, 'users', uid));
+      return s.exists() ? s.data() : null;
+    },
+    async saveProfile(profile) {
+      await setDoc(doc(db, 'users', uid), profile);
+    },
     async createGroup(name, ownerName) {
       const ref = doc(collection(db, 'groups'));
       await setDoc(ref, { name, owner: uid, ownerName, status: 'waiting', round: 1, startDay: null, schedule: [], createdAt: serverTimestamp() });

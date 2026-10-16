@@ -14,6 +14,7 @@ Desafío diario de minijuegos argentos entre amigos, web para celular (después 
 ## Decisiones tomadas
 
 - Guardado en **Firebase** (Firestore + login anónimo). Sin `js/firebase-config.js` configurado funciona en modo prueba local.
+- Login con Google **opcional**: se entra anónimo y el botón "Guardar con Google" asocia la cuenta al mismo uid (`linkWithPopup`). Nombre y lista de desafíos se copian a `users/{uid}` para recuperarlos en otro celular. No se hizo obligatorio porque Google bloquea el login en navegadores internos de apps.
 - 10 días, mínimo 2 jugadores, unirse por link, 3 intentos por día sin pausa, changui (menos de 3 puntos no cuenta) hasta 3 por día, puntos por puesto diario.
 - Juegos sorteados por día sin repetir dos seguidos, misma semilla para todo el grupo.
 - **Los juegos nuevos los define el dueño con sus ideas**: no inventar juegos por cuenta propia. `games/torre.js` está escrito pero fuera del sorteo.

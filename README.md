@@ -22,7 +22,7 @@ Sin Firebase configurado arranca en **modo prueba**: todo se guarda solo en ese 
 ## Conectar Firebase (para jugar de verdad con amigos)
 
 1. Entrá a https://console.firebase.google.com y creá un proyecto (por ejemplo `argengame`). Google Analytics no hace falta.
-2. **Authentication** → Comenzar → Método de acceso → activá **Anónimo**.
+2. **Authentication** → Comenzar → Método de acceso → activá **Anónimo** y también **Google** (te pide un correo de asistencia: elegí el tuyo).
 3. **Firestore Database** → Crear base de datos → ubicación `southamerica-east1` (São Paulo) → modo producción.
 4. En Firestore → **Reglas**, pegá el contenido de [`firestore.rules`](firestore.rules) y publicá.
 5. Configuración del proyecto (engranaje) → Tus apps → ícono web `</>` → registrá la app (sin Hosting).
@@ -30,6 +30,8 @@ Sin Firebase configurado arranca en **modo prueba**: todo se guarda solo en ese 
 7. Authentication → Configuración → **Dominios autorizados** → agregá `fedemeju.github.io`.
 
 La `apiKey` de Firebase para web es pública por diseño; lo que protege los datos son las reglas de Firestore.
+
+Cada amigo entra sin cuenta, solo con su nombre (login anónimo). En el inicio tiene el botón **Guardar con Google**: asocia su cuenta de Google al mismo jugador, y si cambia de celular toca **Entrar con Google** y recupera su nombre y sus desafíos. Google no deja iniciar sesión desde los navegadores internos de otras apps; en ese caso la app le pide abrir el link en Chrome o Safari.
 
 ## Estructura
 

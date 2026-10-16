@@ -16,10 +16,30 @@ const ls = {
 };
 const myName = () => ls.get('name', '');
 const myGroups = () => ls.get('groups', []);
+function setName(n) {
+  ls.set('name', n);
+  pushProfile();
+}
 function rememberGroup(gid) {
+  const isNew = !myGroups().includes(gid);
   const g = myGroups().filter(x => x !== gid);
   g.unshift(gid);
   ls.set('groups', g.slice(0, 30));
+  if (isNew) pushProfile();
+}
+// Con Firebase, nombre y lista de desafíos también quedan en users/{uid} para recuperarlos con Google.
+function pushProfile() {
+  if (api && api.saveProfile) api.saveProfile({ name: myName(), groups: myGroups() }).catch(e => console.error('No se guardó el perfil', e));
+}
+async function syncProfile() {
+  if (!api || !api.loadProfile) return;
+  try {
+    const p = await api.loadProfile();
+    if (p && p.name) ls.set('name', p.name);
+    const groups = [...new Set([...myGroups(), ...((p && p.groups) || [])])].slice(0, 30);
+    ls.set('groups', groups);
+    if (myName() && (!p || p.name !== myName() || (p.groups || []).length !== groups.length)) pushProfile();
+  } catch (e) { console.error('No se cargó el perfil', e); }
 }
 const validId = gid => /^[A-Za-z0-9_-]{6,40}$/.test(gid || '');
 const inviteUrl = gid => `${location.href.split('#')[0]}#/unirse/${gid}`;
@@ -60,6 +80,62 @@ function modeBanner() {
   return '';
 }
 
+/* ---------- cuenta de Google ---------- */
+// Google no deja iniciar sesión dentro de los navegadores internos de otras apps (Instagram, Facebook, etc.).
+function inAppBrowser() {
+  const ua = navigator.userAgent;
+  return /FBAN|FBAV|Instagram|Line\/|WhatsApp|; wv\)/i.test(ua) || (/iPhone|iPad|iPod/.test(ua) && !/Safari/.test(ua));
+}
+const canGoogle = () => api && api.account && !api.account.google;
+
+function accountBlock() {
+  if (!api.account) return '';
+  if (api.account.google) return `<p class="muted small">Guardado con Google${api.account.email ? ' · ' + esc(api.account.email) : ''}.</p>`;
+  return `<section class="card stack">
+    <h2>Guardá tu progreso</h2>
+    <p class="muted small">Si cambiás de celular o se borra el navegador, entrás con Google y seguís en tus desafíos.</p>
+    <button id="google" class="btn">Guardar con Google</button>
+    <p id="gmsg" class="muted small" hidden></p>
+  </section>`;
+}
+
+function bindGoogle() {
+  const b = document.getElementById('google');
+  if (!b) return;
+  const msg = text => { const m = document.getElementById('gmsg'); m.textContent = text; m.hidden = false; };
+  b.onclick = async () => {
+    if (inAppBrowser()) return msg('Google no deja entrar desde el navegador de esta app. Abrí el link en Chrome o Safari (menú ⋮ o compartir → Abrir en el navegador) y guardalo desde ahí.');
+    b.disabled = true;
+    try {
+      await api.linkGoogle();
+      pushProfile();
+      toast('Listo, quedó guardado con Google');
+      route();
+    } catch (e) {
+      b.disabled = false;
+      if (e.code === 'cuenta-usada') {
+        const pierde = myGroups().length > 0;
+        if (pierde && !confirm('Esa cuenta de Google ya tiene un jugador guardado. Si entrás con ella, lo que hiciste en este celular sin guardar se pierde. ¿Entrar igual?')) return;
+        b.disabled = true;
+        try {
+          await api.useGoogle(e.credential);
+          ls.set('name', '');
+          ls.set('groups', []);
+          location.reload();
+        } catch (e2) { b.disabled = false; console.error(e2); msg('No se pudo entrar con Google. Probá de nuevo.'); }
+        return;
+      }
+      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+      console.error(e);
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/web-storage-unsupported')
+        return msg('Este navegador no deja abrir la ventana de Google. Abrí el link en Chrome o Safari y probá de nuevo.');
+      if (e.code === 'auth/operation-not-allowed') return msg('Falta activar Google en Firebase (Authentication → Método de acceso).');
+      if (e.code === 'auth/unauthorized-domain') return msg('Falta autorizar este dominio en Firebase (Authentication → Configuración → Dominios autorizados).');
+      msg('No se pudo guardar con Google. Probá de nuevo.');
+    }
+  };
+}
+
 /* ---------- router ---------- */
 async function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -90,13 +166,19 @@ function renderName() {
       <input id="nm" maxlength="20" autocomplete="nickname" required placeholder="Ej: Fede" value="${esc(myName())}">
       <p class="muted small">Así te van a ver tus amigos en el ranking.</p>
       <button class="btn primary">Seguir</button>
-    </form></main>`);
+    </form>
+    ${!myName() && canGoogle() ? `<div class="card stack">
+      <p class="muted small">¿Ya jugabas en otro celular y lo guardaste con Google?</p>
+      <button id="google" class="btn">Entrar con Google</button>
+      <p id="gmsg" class="muted small" hidden></p>
+    </div>` : ''}</main>`);
+  bindGoogle();
   const f = document.getElementById('f');
   f.onsubmit = e => {
     e.preventDefault();
     const n = f.nm.value.trim().slice(0, 20);
     if (!n) return;
-    ls.set('name', n);
+    setName(n);
     route();
   };
   f.nm.focus();
@@ -143,6 +225,7 @@ async function renderHome() {
         <button class="btn primary">Crear y conseguir el link</button>
       </form>
     </section>
+    ${accountBlock()}
     <section class="stack">
       <h2>Práctica</h2>
       <p class="muted">Probá los juegos cuando quieras. No cuenta para ningún desafío.</p>
@@ -156,6 +239,7 @@ async function renderHome() {
   </main>`);
 
   document.getElementById('rename').onclick = renderName;
+  bindGoogle();
   const cf = document.getElementById('cf');
   document.getElementById('create').onclick = e => { e.currentTarget.hidden = true; cf.hidden = false; cf.gname.select(); };
   cf.onsubmit = async e => {
@@ -208,7 +292,7 @@ async function renderJoin(gid) {
     const n = f.nm.value.trim().slice(0, 20);
     if (!n) return;
     f.querySelector('button').disabled = true;
-    ls.set('name', n);
+    setName(n);
     await api.joinGroup(gid, n);
     rememberGroup(gid);
     go('#/g/' + gid);
@@ -494,6 +578,7 @@ async function showResult(game, rk, score, info) {
   } catch (e) {
     console.error(e);
   }
+  await syncProfile();
   window.addEventListener('hashchange', route);
   window.addEventListener('resize', () => paintIcons());
   route();
