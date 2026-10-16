@@ -74,7 +74,7 @@ export default {
       dir: { x: 0, y: -1 }, queue: [], foods: [],
       score: 0, combo: 1, comboSteps: 0, eaten: 0,
       stepMs: 165, acc: 0, alive: true, started: false,
-      shake: 0, particles: [], floats: [],
+      shake: 0, particles: [], floats: [], headAngle: Math.PI,
     };
     let endTimer = 0;
     const report = () => onScore(S.score, 'Racha x' + S.combo);
@@ -222,11 +222,15 @@ export default {
 
       const h = pts[0], d = S.dir, head = getCustom('head');
       if (head) {
-        // La cabeza propia está de frente: siempre derecha, espejada cuando va a la izquierda.
-        const hs = cell * 1.45;
-        ctx.save(); ctx.translate(h.x, h.y - cell * 0.12);
-        if (d.x < 0) ctx.scale(-1, 1);
-        ctx.drawImage(head, -hs / 2, -hs / 2, hs, hs);
+        // En la imagen la boina está arriba y los ojos miran abajo: se rota para que miren
+        // hacia donde avanza y la boina quede del lado del cuerpo. La cara (centro en y≈138/256) calza en la celda.
+        const target = Math.atan2(d.y, d.x) - Math.PI / 2;
+        let diff = target - S.headAngle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        S.headAngle += diff * Math.min(1, dt / 70);
+        const hs = cell * 1.75;
+        ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(S.headAngle);
+        ctx.drawImage(head, -hs / 2, -hs / 2 - hs * 0.04, hs, hs);
         ctx.restore();
       } else {
         if (S.alive && Math.floor(now / 700) % 4 === 0) {

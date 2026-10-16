@@ -57,7 +57,10 @@ export const PAINT = {
   },
 };
 
-const FILES = { mate: 'assets/mate.png', empa: 'assets/empanada.png', alfa: 'assets/alfajor.png', head: 'assets/cabeza.png' };
+const FILES = {
+  mate: 'assets/mate.png', empa: 'assets/empanada.png', alfa: 'assets/alfajor.png', head: 'assets/cabeza.png',
+  fitito: 'assets/fitito.png', auto1: 'assets/auto1.png', auto2: 'assets/auto2.png', auto3: 'assets/auto3.png', camion: 'assets/camion.png',
+};
 const custom = {};
 
 export function loadCustomArt(onLoad) {

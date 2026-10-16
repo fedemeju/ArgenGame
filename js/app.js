@@ -444,6 +444,7 @@ function renderGame(game, rk, seed, attemptNo) {
     onScore(s, extra) { last = s; gs.textContent = s; gx.textContent = extra || 'Puntos'; },
     onEnd: finish,
   });
+  if (location.hostname === 'localhost') window.__partida = inst; // solo para pruebas locales
   // Si se va de la pantalla con el botón atrás, el intento se cierra con los puntos que tenía.
   current = {
     abort() {

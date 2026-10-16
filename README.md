@@ -55,7 +55,9 @@ Después se agrega a la lista de `games/index.js`. Usar siempre el `seed` para e
 ## Pendientes
 
 - [x] **Imágenes propias** de mate, empanada, alfajor y cabeza de la víbora (en `assets/`).
-- [ ] **Juegos nuevos**: definir las ideas. `games/torre.js` (Torre de Alfajores) está escrito pero fuera del sorteo.
+- [x] El Fitito en la Panamericana (`games/fitito.js`).
+- [ ] **Fotos de autos** para el Fitito: `assets/fitito.png` (desde atrás), `assets/auto1.png`…`auto3.png` y `assets/camion.png` (de frente). Mientras tanto usa dibujos provisorios.
+- [ ] **Más juegos**: con las ideas del usuario. `games/torre.js` (Torre de Alfajores) está escrito pero fuera del sorteo.
 - [ ] Conectar Firebase (pasos arriba).
 
 ## Imágenes propias
