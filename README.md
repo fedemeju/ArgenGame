@@ -8,6 +8,7 @@ Desafíos diarios de minijuegos argentos entre amigos, desde el celular. Es web 
 - Con **2 jugadores o más**, quien lo creó lo arranca. Desde ese día dura **10 días**.
 - Cada día toca un **minijuego sorteado** (sin repetir dos días seguidos) y todos juegan la misma partida: la misma semilla para todo el grupo.
 - **3 intentos por día**, vale el mejor. No hay pausa: si salís de la app, la partida termina con los puntos que tenías.
+- Los intentos del desafío se juegan **solo desde el celular** (o una tablet), así es parejo para todos. En la compu se puede practicar.
 - **Changui:** si un intento hace menos de 3 puntos, no cuenta y se devuelve. Hasta 3 changuis por día.
 - **Puntos por puesto** cada día (1° 10, 2° 8, 3° 6, 4° 5, 5° 4, 6° 3, 7° 2, 8° 1). Gana el que más suma en los 10 días; desempata quien ganó más días.
 - Al terminar, quien lo creó puede arrancar la **revancha** con el mismo grupo.
@@ -43,6 +44,7 @@ Cada amigo entra sin cuenta, solo con su nombre (login anónimo). En el inicio t
 | `js/data.js` | Guardado: Firebase o modo prueba local |
 | `js/engine.js` | Herramientas para los juegos: azar con semilla, canvas, controles, sonido |
 | `js/art.js` | Dibujos provisorios y carga de imágenes de `assets/` |
+| `js/pixel.js` | Herramientas para dibujar pixel art en código (rectángulos, óvalos, contorno, letra de 3x5) |
 | `games/` | Un archivo por minijuego; `games/index.js` dice cuáles entran en el sorteo |
 | `firestore.rules` | Reglas de seguridad de Firestore |
 | `tools/version.mjs` | Pone versión nueva a los archivos para que los celulares no usen los viejos del caché. Correr `node tools/version.mjs` antes de cada subida |
@@ -59,7 +61,8 @@ Después se agrega a la lista de `games/index.js`. Usar siempre el `seed` para e
 
 - [x] **Imágenes propias** de mate, empanada, alfajor y cabeza de la víbora (en `assets/`).
 - [x] El Fitito en la Panamericana (`games/fitito.js`).
-- [ ] **Fotos de autos** para el Fitito: `assets/fitito.png` (desde atrás), `assets/auto1.png`…`auto3.png` y `assets/camion.png` (de frente). Mientras tanto usa dibujos provisorios.
+- [x] El Fitito en pixel art, con la ruta recta y el paisaje argento (`games/fitito-art.js`).
+- [x] Conectar Firebase.
 - [ ] **Más juegos**: con las ideas del usuario. `games/torre.js` (Torre de Alfajores) está escrito pero fuera del sorteo.
 - [ ] Conectar Firebase (pasos arriba).
 

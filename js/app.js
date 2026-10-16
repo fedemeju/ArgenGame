@@ -438,6 +438,13 @@ async function renderGroup(gid) {
 }
 
 /* ---------- reglas y partida ---------- */
+// Los desafíos se juegan solo con pantalla táctil (celular o tablet): con teclado en la compu es más fácil.
+// La práctica sí se puede en la compu, y en localhost se deja todo para probar.
+function canPlayRanked() {
+  if (['localhost', '127.0.0.1'].includes(location.hostname)) return true;
+  return navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches;
+}
+
 async function renderRanked(gid) {
   loading();
   const d = await loadGroup(gid);
@@ -465,15 +472,20 @@ function renderRules(game, rk) {
           <li>Tenés ${T.ATTEMPTS} intentos por día y vale el mejor.</li>
           <li><b>Changui:</b> si hacés menos de ${game.threshold} puntos, el intento no cuenta y lo recuperás. Hasta ${T.CHANGUIS} por día; ${chLeft === 0 ? 'hoy ya los usaste todos' : `hoy te ${chLeft === 1 ? 'queda 1' : `quedan ${chLeft}`}`}.</li>
           <li><b>No hay pausa:</b> si salís de la app, cambiás de pestaña o bloqueás el celular, la partida termina con los puntos que tengas.</li>
-          <li>Todos juegan la misma partida del día: la comida sale igual para todos.</li>
+          <li>Todos juegan la misma partida del día: sale todo igual para todos.</li>
         </ul></div>` : ''}
-      <button id="go" class="btn primary big">${rk ? `Jugar · intento ${rk.play.used + 1} de ${T.ATTEMPTS}` : 'Jugar'}</button>
+      ${rk && !canPlayRanked()
+        ? `<p class="banner warn">Los desafíos se juegan solo desde el celular, así es parejo para todos. Abrí el link en tu teléfono.</p>
+           <a class="btn" href="#/practica/${esc(game.id)}">Practicar en la compu</a>`
+        : `<button id="go" class="btn primary big">${rk ? `Jugar · intento ${rk.play.used + 1} de ${T.ATTEMPTS}` : 'Jugar'}</button>`}
     </section>
   </main>`);
-  document.getElementById('go').onclick = e => { e.currentTarget.disabled = true; startPlay(game, rk); };
+  const goBtn = document.getElementById('go');
+  if (goBtn) goBtn.onclick = e => { e.currentTarget.disabled = true; startPlay(game, rk); };
 }
 
 async function startPlay(game, rk) {
+  if (rk && !canPlayRanked()) return renderRules(game, rk);
   audio.unlock();
   let n = 0;
   if (rk) {

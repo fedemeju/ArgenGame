@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0;background:#222}#g{position:relative;width:375px;height:812px;overflow:hidden}#s{image-rendering:pixelated}</style>
+<div id="g"></div>
+<script type="module">
+import game from '../games/fitito.js';
+import * as ART from '../games/fitito-art.js';
+const q = new URLSearchParams(location.search);
+if (q.get('modo') === 'dibujos') {
+  document.getElementById('g').remove();
+  const list = [ART.fitito(), ...ART.cars(), ART.camion(), ...ART.baches(), ART.eucalipto(), ART.poste(), ART.gauchito(), ART.parrilla(),
+    ART.puesto('PAN CASERO'), ART.vaca(true), ART.vaca(false), ART.molino(), ART.ypf(), ART.cartel('ESCOBAR', '12 KM'), ART.nube(44), ART.peaje()];
+  const k = 3, c = document.createElement('canvas'); c.id = 's'; c.width = 1200; c.height = 1300;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.fillStyle = '#6a8fb0'; g.fillRect(0, 0, c.width, c.height);
+  let x = 8, y = 8, row = 0;
+  for (const s of list) {
+    const w = s.width * k, h = s.height * k;
+    if (x + w > c.width) { x = 8; y += row + 8; row = 0; }
+    g.drawImage(s, x, y, w, h); x += w + 8; row = Math.max(row, h);
+  }
+  document.body.appendChild(c);
+} else {
+  const inst = game.mount(document.getElementById('g'), { seed: Number(q.get('seed') || 3), onScore() {}, onEnd() {} });
+  inst._move(0);
+  const steps = Number(q.get('pasos') || 200);
+  for (let i = 0; i < steps; i++) inst._update(16);
+  if (q.get('carril')) inst._move(Number(q.get('carril')));
+  for (let i = 0; i < 12; i++) inst._update(16);
+  inst._state.started = false;
+  inst._draw(16, 1000);
+}
+</script>
