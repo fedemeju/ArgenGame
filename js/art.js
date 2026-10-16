@@ -59,6 +59,7 @@ export const PAINT = {
 
 const FILES = {
   mate: 'assets/mate.png', empa: 'assets/empanada.png', alfa: 'assets/alfajor.png', head: 'assets/cabeza.png',
+  fitito: 'assets/fitito.png',
 };
 const custom = {};
 

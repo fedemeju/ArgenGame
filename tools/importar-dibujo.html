@@ -1,0 +1,75 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Pasa una imagen hecha con IA (fondo magenta liso) a un sprite de pixel art del tamaño del juego.
+     Uso: tools/importar-dibujo.html?src=../assets/nuevas/fitito.png&ancho=60
+     Saca el fondo magenta que toca los bordes, pinta de vidrio el magenta encerrado (ventanillas),
+     recorta, achica tomando el color que más se repite en cada bloque y deja el PNG en #out. -->
+<style>body{margin:0;background:#6a8fb0;font:12px monospace}canvas{image-rendering:pixelated;display:block;margin:8px}</style>
+<pre id="out"></pre>
+<script>
+const q = new URLSearchParams(location.search);
+const TW = Number(q.get('ancho') || 60);
+const GLASS = q.get('vidrio') || '#2f4b63';
+const img = new Image();
+img.onload = () => {
+  const w = img.width, h = img.height;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const id = g.getImageData(0, 0, w, h), d = id.data;
+  const key = i => d[i] - d[i + 1] > 90 && d[i + 2] - d[i + 1] > 90;
+  // fondo: magenta conectado con los bordes
+  const bg = new Uint8Array(w * h), stack = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+  while (stack.length) {
+    const p = stack.pop();
+    if (bg[p] || !key(p * 4)) continue;
+    bg[p] = 1;
+    const x = p % w, y = (p / w) | 0;
+    if (x > 0) stack.push(p - 1); if (x < w - 1) stack.push(p + 1);
+    if (y > 0) stack.push(p - w); if (y < h - 1) stack.push(p + w);
+  }
+  const gl = parseInt(GLASS.slice(1), 16);
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let p = 0; p < w * h; p++) {
+    const i = p * 4;
+    if (bg[p]) { d[i + 3] = 0; continue; }
+    if (key(i)) { d[i] = gl >> 16; d[i + 1] = (gl >> 8) & 255; d[i + 2] = gl & 255; }
+    const x = p % w, y = (p / w) | 0;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  // achicar: en cada bloque gana el color más repetido (o transparente si casi todo es fondo)
+  const bw = (x1 - x0 + 1) / TW, TH = Math.max(1, Math.round((y1 - y0 + 1) / bw));
+  const o = document.createElement('canvas'); o.width = TW; o.height = TH;
+  const og = o.getContext('2d'), od = og.createImageData(TW, TH);
+  for (let ty = 0; ty < TH; ty++) for (let tx = 0; tx < TW; tx++) {
+    const sx0 = Math.floor(x0 + tx * bw), sx1 = Math.floor(x0 + (tx + 1) * bw), sy0 = Math.floor(y0 + ty * bw), sy1 = Math.floor(y0 + (ty + 1) * bw);
+    const count = new Map(); let opaque = 0, total = 0;
+    for (let y = sy0; y < sy1; y++) for (let x = sx0; x < sx1; x++) {
+      total++;
+      const i = (y * w + x) * 4;
+      if (!d[i + 3]) continue;
+      opaque++;
+      const k = (d[i] >> 3) << 10 | (d[i + 1] >> 3) << 5 | (d[i + 2] >> 3);
+      const e = count.get(k) || [0, 0, 0, 0];
+      e[0]++; e[1] += d[i]; e[2] += d[i + 1]; e[3] += d[i + 2];
+      count.set(k, e);
+    }
+    const oi = (ty * TW + tx) * 4;
+    if (opaque < total * 0.5) continue;
+    let best = null;
+    if (q.get('modo') === 'promedio') {
+      best = [0, 0, 0, 0];
+      for (const e of count.values()) for (let k = 0; k < 4; k++) best[k] += e[k];
+    } else for (const e of count.values()) if (!best || e[0] > best[0]) best = e;
+    od.data[oi] = best[1] / best[0]; od.data[oi + 1] = best[2] / best[0]; od.data[oi + 2] = best[3] / best[0]; od.data[oi + 3] = 255;
+  }
+  og.putImageData(od, 0, 0);
+  const big = document.createElement('canvas'); big.width = TW * 6; big.height = TH * 6;
+  const bg2 = big.getContext('2d'); bg2.imageSmoothingEnabled = false; bg2.drawImage(o, 0, 0, big.width, big.height);
+  document.body.appendChild(big);
+  document.getElementById('out').textContent = 'PNG:' + o.toDataURL('image/png') + ':FIN ' + TW + 'x' + TH;
+};
+img.onerror = () => { document.getElementById('out').textContent = 'ERROR: no se pudo abrir ' + q.get('src'); };
+img.src = q.get('src');
+</script>

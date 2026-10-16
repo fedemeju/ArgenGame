@@ -1,5 +1,6 @@
 import { makeCanvas, startLoop, bindInput, mulberry32, audio, buzz, overlay, flash } from '../js/engine.js';
 import { painter } from '../js/pixel.js';
+import { getCustom } from '../js/art.js';
 import * as ART from './fitito-art.js';
 
 // Ruta pseudo 3D al estilo arcade, recta, dibujada en pixel art: se pinta en un lienzo chico
@@ -100,7 +101,7 @@ export default {
       p.rect(L / 2 - half * 1.17, y, half * 2.34, 1, y % 6 < 3 ? COLORS.light.rumble : COLORS.dark.rumble);
       p.rect(L / 2 - half, y, half * 2, 1, COLORS.light.road);
     }
-    const f = art().fitito;
+    const f = getCustom('fitito') || art().fitito;
     g.drawImage(f, Math.round((L - f.width) / 2), L - f.height - 2);
     c.imageSmoothingEnabled = false;
     c.drawImage(lo, 0, 0, s, s);
@@ -285,7 +286,7 @@ export default {
       }
 
       // el Fitito
-      const img = SPR.fitito, fw = img.width, fh = img.height, ground = H - Math.round(H * 0.03);
+      const img = getCustom('fitito') || SPR.fitito, fw = img.width, fh = img.height, ground = H - Math.round(H * 0.03);
       let cy = ground - fh, rot = 0;
       const moving = S.alive && S.started;
       if (moving && Math.sin(now / 45) > 0.4) cy -= 1;
