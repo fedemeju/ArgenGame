@@ -49,10 +49,11 @@ const TITLES = {
 // Imágenes del carpincho y el tero (assets/carpincho/); si no cargaron, se dibujan en código.
 // corre.webp es una tira de 15 cuadros sacados de un video (3 pasos de trote): el ciclo entero dura RUN_CYCLE metros.
 const RUN_FRAMES = 15, RUN_CYCLE = 3;
+const TERO_FRAMES = 9;                   // tero.webp: un aleteo completo en 9 cuadros, también sacado de un GIF
 const IMG = () => ({
   corre: getCustom('carpCorre'),
   salto: getCustom('carpSalto'), agachado: getCustom('carpAgachado'),
-  tero: [getCustom('tero1'), getCustom('tero2')].filter(Boolean),
+  tero: getCustom('teroVuela'),
 });
 
 /* ---------- paisaje: se genera por tramos, con su propio azar ---------- */
@@ -600,11 +601,11 @@ export default {
         }
         case 'tero': {
           if (part !== 'back') return; // por detrás del carpincho: las alas bajan sin atravesarlo
-          const frames = IMG().tero;
+          const img = IMG().tero;
           const [cx, cy] = P(ox + 0.25, 0.74, z + 0.05);
-          if (frames.length) {
-            const img = frames[Math.floor(now / 110) % frames.length], w = 0.8 * s, h = w * img.height / img.width;
-            ctx.drawImage(img, cx - w / 2, cy - h * 0.5, w, h);
+          if (img) {
+            const fw = img.width / TERO_FRAMES, f = Math.floor(now / 70) % TERO_FRAMES, w = 0.8 * s, h = w * img.height / fw;
+            ctx.drawImage(img, f * fw, 0, fw, img.height, cx - w / 2, cy - h * 0.62, w, h); // el cuerpo está a 0,62 del alto
           } else drawTeroCode(cx, cy, s, now);
           break;
         }
