@@ -1,4 +1,4 @@
-import { makeCanvas, startLoop, mulberry32, audio, buzz, rrect, circle, overlay, flash } from '../js/engine.js';
+import { makeCanvas, startLoop, bindInput, mulberry32, audio, buzz, rrect, circle, overlay, flash } from '../js/engine.js';
 import { getCustom } from '../js/art.js';
 
 // Ruta pseudo 3D al estilo arcade: la calle es una tira de segmentos proyectados desde una cámara detrás del auto.
@@ -120,10 +120,9 @@ export default {
   threshold: 3,
   rules: [
     'Manejás un Fiat 600 atado con alambre por la Panamericana. Acelera solo.',
-    'Mantené apretado el lado izquierdo o derecho de la pantalla para doblar.',
-    'Vienen autos y camiones de frente: esquivalos.',
+    'Hay 3 carriles. Tocá el lado izquierdo o derecho de la pantalla: cada toque te mueve un carril.',
+    'Vienen autos y camiones de frente, a veces dos juntos: siempre queda un carril libre.',
     'Los baches gigantes te vuelan la suspensión.',
-    'Por la banquina el auto frena, y si te llevás puesto un árbol o un cartel, perdés.',
     'Cada cuadra recorrida suma 1 punto. Cuanto más lejos, más rápido.',
   ],
   icon(c, s) {
@@ -139,7 +138,7 @@ export default {
 
   mount(el, { seed, onScore, onEnd }) {
     const st = makeCanvas(el), ctx = st.ctx, rng = mulberry32(seed);
-    const pill = overlay(el, 'g-pill', 'Mantené apretado un costado para doblar');
+    const pill = overlay(el, 'g-pill', 'Tocá un costado para cambiar de carril');
     const toast = overlay(el, 'g-toast');
 
     // Imágenes: las propias si existen, si no los dibujos provisorios.
@@ -181,39 +180,49 @@ export default {
     const TRACK = N * SEG;
 
     const S = {
-      pos: 0, speed: 0, x: 0, steer: 0, started: false, alive: true,
-      obstacles: [], nextObs: SEG * 60, skyX: 0, shake: 0, crash: null, cuadras: 0,
+      pos: 0, speed: 0, lane: 1, x: 0, started: false, alive: true,
+      obstacles: [], nextObs: SEG * 50, skyX: 0, shake: 0, crash: null, cuadras: 0,
     };
     let endTimer = 0;
     const PLAYER_Z = CAM_H * DEPTH;
+    // Todo el tráfico (autos y pozos) avanza hacia el auto a la misma velocidad, en filas rígidas:
+    // la distancia entre filas no cambia nunca, así la regla de "siempre un carril libre" es exacta.
+    const CAR_V = MAX_SPEED * 0.15;
+    const SAFE_Z = SEG * 24;         // filas más cerca que esto cuentan como una sola para tapar carriles
     const laneX = l => -1 + (2 * l + 1) / LANES;
     const report = () => onScore(S.cuadras, `Cuadras · ${Math.round(S.speed / MAX_SPEED * 140)} km/h`);
 
+    // Fila nueva de 1 o 2 obstáculos. Nunca deja los 3 carriles tapados: ni sola, ni junto con
+    // otra fila (de pozos o de autos) que venga pegada.
     function spawnRow() {
+      const level = Math.min(1, S.cuadras / 50);
       const z = S.pos + PLAYER_Z + SEG * DRAW * 0.95;
-      const lanes = [0, 1, 2].sort(() => rng() - 0.5);
-      const level = Math.min(1, S.cuadras / 60);
-      const n = rng() < 0.15 + level * 0.35 ? 2 : 1;
-      for (let k = 0; k < n; k++) {
-        const lane = lanes[k];
-        if (rng() < 0.3) S.obstacles.push({ kind: 'bache', z, x: laneX(lane) + (rng() - 0.5) * 0.2, w: 0.5 });
+      const baches = rng() < 0.3;
+      const v = CAR_V;
+      const near = new Set(S.obstacles.filter(o => Math.abs(o.z - z) < SAFE_Z).map(o => o.lane));
+      const want = rng() < 0.4 + level * 0.3 ? 2 : 1;
+      const combos = want === 2 ? [[0, 1], [1, 2], [0, 2]] : [[0], [1], [2]];
+      for (let i = combos.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [combos[i], combos[j]] = [combos[j], combos[i]]; }
+      let lanes = combos.find(c => new Set([...near, ...c]).size <= 2);
+      if (!lanes) lanes = [0, 1, 2].filter(l => near.has(l)).slice(0, 1);
+      for (const lane of lanes) {
+        if (baches) S.obstacles.push({ kind: 'bache', lane, z, x: laneX(lane) + (rng() - 0.5) * 0.16, w: 0.5, v });
         else {
           const truck = rng() < 0.18;
           S.obstacles.push({
-            kind: truck ? 'camion' : 'auto', z, x: laneX(lane), w: truck ? 0.5 : 0.36,
+            kind: truck ? 'camion' : 'auto', lane, z, x: laneX(lane), w: truck ? 0.5 : 0.36, v,
             img: truck ? SPR.truck : SPR.cars[Math.floor(rng() * SPR.cars.length)],
-            v: MAX_SPEED * (0.12 + rng() * 0.18),
           });
         }
       }
-      S.nextObs = SEG * (34 - level * 16) * (0.8 + rng() * 0.5);
+      S.nextObs = SEG * (20 - level * 8) * (0.8 + rng() * 0.4);
     }
 
     function die(kind) {
       S.alive = false; S.shake = 1; S.crash = { kind, t: 0 };
       audio.lose(); buzz(kind === 'bache' ? [80, 40, 120] : [60, 40, 90]);
       report();
-      const title = { bache: '¡Volaste la suspensión!', camion: '¡Te comiste un camión!', cartel: '¡Te fuiste a la banquina!' }[kind] || '¡Choque de frente!';
+      const title = { bache: '¡Volaste la suspensión!', camion: '¡Te comiste un camión!' }[kind] || '¡Choque de frente!';
       endTimer = setTimeout(() => onEnd(S.cuadras, { title }), 1100);
     }
 
@@ -224,18 +233,11 @@ export default {
       const seg = segs[Math.floor(prevPz / SEG) % N];
       const pct = S.speed / MAX_SPEED;
       const top = MAX_SPEED * Math.min(1, 0.5 + S.cuadras * 0.008);
-      const off = Math.abs(S.x) > 1;
-      if (off) S.speed += (MAX_SPEED * 0.22 - S.speed) * Math.min(1, sec * 2);
-      else S.speed = Math.min(top, S.speed + MAX_SPEED * 0.35 * sec);
+      S.speed = Math.min(top, S.speed + MAX_SPEED * 0.35 * sec);
       S.pos += S.speed * sec;
-      S.x += S.steer * sec * 2.2 * Math.max(0.35, pct);
-      S.x -= sec * 2.2 * pct * pct * seg.curve * 0.32;
-      S.x = Math.max(-1.8, Math.min(1.8, S.x));
-      if (off) {
-        for (let i = Math.floor(prevPz / SEG); i <= Math.floor((S.pos + PLAYER_Z) / SEG); i++) {
-          for (const sp of segs[i % N].sprites) if (Math.abs(sp.x - S.x) < (sp.w + CAR_W) / 2 * 0.7) return die('cartel');
-        }
-      }
+      // el auto va al centro de su carril en un instante (cambio de carril de ~0,12 s)
+      const tx = laneX(S.lane), step = sec * 6;
+      S.x = Math.abs(tx - S.x) <= step ? tx : S.x + Math.sign(tx - S.x) * step;
       S.skyX += seg.curve * pct * sec * 0.02;
 
       const c = Math.floor(S.pos / CUADRA);
@@ -334,7 +336,7 @@ export default {
       ctx.beginPath(); ctx.ellipse(W / 2, H - H * 0.03, cw * 0.5, ch * 0.1, 0, 0, Math.PI * 2); ctx.fill();
       ctx.save();
       ctx.translate(cx + cw / 2, cy + ch / 2 + bounce);
-      ctx.rotate(rot + S.steer * 0.04);
+      ctx.rotate(rot + Math.max(-1, Math.min(1, (laneX(S.lane) - S.x) * 4)) * 0.06);
       ctx.drawImage(img, -cw / 2, -ch / 2, cw, ch);
       ctx.restore();
       ctx.restore();
@@ -374,63 +376,24 @@ export default {
       ctx.fillStyle = 'rgba(120,160,200,.35)'; ctx.beginPath(); ctx.ellipse(cx - w * 0.2, p.y - h * 0.6, w * 0.5, h * 0.4, 0, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Controles: mantener apretado un costado de la pantalla (o flechas / A-D).
-    const touches = new Map();
-    const refresh = () => {
-      let s = 0;
-      for (const v of touches.values()) s = v;
-      S.steer = s || keySteer;
-    };
-    let keySteer = 0;
-    const start = () => { if (!S.started && S.alive) { S.started = true; pill.hidden = true; } };
-    const pd = e => {
-      if (e.button > 0) return;
-      audio.unlock(); start();
-      const r = el.getBoundingClientRect();
-      touches.set(e.pointerId, e.clientX - r.left < r.width / 2 ? -1 : 1);
-      refresh();
-    };
-    const pm = e => {
-      if (!touches.has(e.pointerId)) return;
-      const r = el.getBoundingClientRect();
-      touches.set(e.pointerId, e.clientX - r.left < r.width / 2 ? -1 : 1);
-      refresh();
-    };
-    const pu = e => { touches.delete(e.pointerId); refresh(); };
-    const kd = e => {
-      const k = e.key.toLowerCase();
-      if (k === 'arrowleft' || k === 'a') keySteer = -1;
-      else if (k === 'arrowright' || k === 'd') keySteer = 1;
-      else if (k !== ' ' && k !== 'arrowup' && k !== 'w') return;
-      e.preventDefault(); audio.unlock(); start(); refresh();
-    };
-    const ku = e => {
-      const k = e.key.toLowerCase();
-      if ((k === 'arrowleft' || k === 'a') && keySteer < 0) keySteer = 0;
-      if ((k === 'arrowright' || k === 'd') && keySteer > 0) keySteer = 0;
-      refresh();
-    };
-    el.addEventListener('pointerdown', pd);
-    window.addEventListener('pointermove', pm);
-    window.addEventListener('pointerup', pu);
-    window.addEventListener('pointercancel', pu);
-    window.addEventListener('keydown', kd);
-    window.addEventListener('keyup', ku);
+    // Controles: cada toque en un costado de la pantalla mueve un carril (flechas o A-D en compu).
+    function move(dir) {
+      if (!S.alive) return;
+      if (!S.started) { S.started = true; pill.hidden = true; }
+      const lane = Math.max(0, Math.min(LANES - 1, S.lane + dir));
+      if (lane !== S.lane) { S.lane = lane; audio.tone(dir < 0 ? 330 : 392, 0.05, 'square', 0.06); buzz(8); }
+    }
+    const unbind = bindInput(el, {
+      onDown: p => move(p.key ? 0 : p.x < p.w / 2 ? -1 : 1),
+      onSwipe: d => { if (d.x) move(d.x); else move(0); },
+    });
 
     report();
     const stop = startLoop((dt, now) => { update(dt); draw(dt, now); });
 
     return {
-      destroy() {
-        stop(); clearTimeout(endTimer); st.destroy(); pill.remove(); toast.remove();
-        el.removeEventListener('pointerdown', pd);
-        window.removeEventListener('pointermove', pm);
-        window.removeEventListener('pointerup', pu);
-        window.removeEventListener('pointercancel', pu);
-        window.removeEventListener('keydown', kd);
-        window.removeEventListener('keyup', ku);
-      },
-      _state: S, _update: update,
+      destroy() { stop(); unbind(); clearTimeout(endTimer); st.destroy(); pill.remove(); toast.remove(); },
+      _state: S, _update: update, _move: move,
     };
   },
 };
