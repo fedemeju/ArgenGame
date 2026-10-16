@@ -39,6 +39,8 @@ img.onload = () => {
   x0 = Math.max(0, x0 - 2); y0 = Math.max(0, y0 - 2); x1 = Math.min(pw - 1, x1 + 2); y1 = Math.min(h - 1, y1 + 2);
   const bw = x1 - x0 + 1, bh = y1 - y0 + 1, TH = Math.round(bh * TW / bw);
   const lines = [];
+  // con tira=1 sale un solo PNG con todos los cuadros uno al lado del otro (un solo archivo para el celular)
+  const strip = q.get('tira') ? Object.assign(document.createElement('canvas'), { width: TW * N, height: TH }) : null;
   for (let f = 0; f < N; f++) {
     // achica de a mitades para que quede suave
     let src = document.createElement('canvas'); src.width = bw; src.height = bh;
@@ -50,9 +52,12 @@ img.onload = () => {
     }
     const o = document.createElement('canvas'); o.width = TW; o.height = TH;
     const og = o.getContext('2d'); og.imageSmoothingQuality = 'high'; og.drawImage(src, 0, 0, TW, TH);
+    if (strip) { strip.getContext('2d').drawImage(o, f * TW, 0); continue; }
     document.body.appendChild(o);
     lines.push('PNG' + f + ':' + o.toDataURL('image/png') + ':FIN');
   }
+  // &formato=webp: mucho más liviano y sigue siendo transparente
+  if (strip) { document.body.appendChild(strip); lines.push('PNG0:' + strip.toDataURL(q.get('formato') === 'webp' ? 'image/webp' : 'image/png', 0.86) + ':FIN'); }
   document.getElementById('out').textContent = lines.join('\n') + '\nTAM ' + TW + 'x' + TH;
 };
 img.onerror = () => { document.getElementById('out').textContent = 'ERROR: no se pudo abrir ' + q.get('src'); };

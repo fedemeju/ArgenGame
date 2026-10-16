@@ -47,8 +47,10 @@ const TITLES = {
 };
 
 // Imágenes del carpincho y el tero (assets/carpincho/); si no cargaron, se dibujan en código.
+// corre.webp es una tira de 15 cuadros sacados de un video (3 pasos de trote): el ciclo entero dura RUN_CYCLE metros.
+const RUN_FRAMES = 15, RUN_CYCLE = 3;
 const IMG = () => ({
-  corre: [getCustom('carp1'), getCustom('carp2')].filter(Boolean),
+  corre: getCustom('carpCorre'),
   salto: getCustom('carpSalto'), agachado: getCustom('carpAgachado'),
   tero: [getCustom('tero1'), getCustom('tero2')].filter(Boolean),
 });
@@ -109,8 +111,8 @@ export default {
     g.addColorStop(0, '#3a5f96'); g.addColorStop(0.45, '#f2b088'); g.addColorStop(0.55, '#7bab4c'); g.addColorStop(1, '#3f7a2c');
     c.fillStyle = g; c.fillRect(0, 0, s, s);
     c.fillStyle = '#d9cbb0'; c.fillRect(0, s * 0.72, s, s * 0.12);
-    const img = IMG().corre[0];
-    if (img) { const w = s * 0.86, h = w * img.height / img.width; c.drawImage(img, (s - w) / 2, s * 0.8 - h, w, h); }
+    const img = IMG().corre;
+    if (img) { const fw = img.width / RUN_FRAMES, w = s * 0.86, h = w * img.height / fw; c.drawImage(img, 0, 0, fw, img.height, (s - w) / 2, s * 0.8 - h, w, h); }
     else { c.save(); c.translate(s * 0.48, s * 0.8); c.scale(s * 0.7, -s * 0.7); paintCarpincho(c, 0, false, false); c.restore(); }
   },
 
@@ -655,9 +657,9 @@ export default {
     function drawPlayer(now, dt) {
       const s = F / Z0, im = IMG();
       const running = S.started && S.alive && S.y === 0 && !S.duck;
-      const phase = (S.d * 0.9) % 1, wave = Math.sin(phase * 2 * Math.PI);
-      // galope: sube y baja una vez por paso y se mece apenas
-      const bob = running ? (1 - Math.cos(phase * 2 * Math.PI)) * 0.5 * 0.045 : 0;
+      const phase = (S.d * 0.9) % 1, wave = im.corre ? 0 : Math.sin(phase * 2 * Math.PI);
+      // con el dibujo en código simula el galope; la tira del video ya trae su propio movimiento
+      const bob = running && !im.corre ? (1 - Math.cos(phase * 2 * Math.PI)) * 0.5 * 0.045 : 0;
       const [sx, sy] = P(S.d, S.y + bob, Z0);
       // en el aire se inclina siguiendo la velocidad, sin saltos bruscos
       const targetRot = S.y > 0 ? Math.max(-0.22, Math.min(0.22, -S.vy * 0.03)) : 0;
@@ -667,18 +669,11 @@ export default {
       if (S.y > 0) { const u = Math.min(1, Math.abs(S.vy) / JUMP_V); ky = 1 + 0.07 * u; kx = 1 - 0.05 * u; }
       if (S.landT > 0) { const e = Math.sin(S.landT / 0.18 * Math.PI / 2); ky *= 1 - 0.13 * e; kx *= 1 + 0.09 * e; }
       if (S.duckT > 0) ky *= 1 + 0.25 * S.duckT / 0.12;
+      // cada frame: [imagen, transparencia, cuadro de la tira (o -1 si es una imagen sola)]
       let frames = [], ww = 1.3, vs = 1;
-      if (S.y > 0 && im.salto) frames = [[im.salto, 1]];
-      else if (S.duck && im.agachado) { frames = [[im.agachado, 1]]; ww = 1.45; vs = 0.8; }
-      else if (im.corre.length) {
-        if (!running) frames = [[im.corre[0], 1]];
-        else {
-          // dos cuadros que se funden al final de cada medio paso
-          const half = phase * 2, f = Math.floor(half) % im.corre.length, local = half % 1;
-          frames = [[im.corre[f], 1]];
-          if (local > 0.7) frames.push([im.corre[(f + 1) % im.corre.length], (local - 0.7) / 0.3]);
-        }
-      }
+      if (S.y > 0 && im.salto) frames = [[im.salto, 1, -1]];
+      else if (S.duck && im.agachado) { frames = [[im.agachado, 1, -1]]; ww = 1.45; vs = 0.8; }
+      else if (im.corre) frames = [[im.corre, 1, running ? Math.floor((S.d / RUN_CYCLE % 1) * RUN_FRAMES) : 0]];
       ctx.save();
       ctx.translate(sx, sy - 0.35 * s);
       if (S.crash) {
@@ -688,10 +683,13 @@ export default {
       } else ctx.rotate(S.rot + (running ? wave * 0.025 : 0));
       ctx.translate(0, 0.35 * s);
       if (frames.length) {
-        for (const [img, a] of frames) {
-          const dw = ww * s * kx, dh = ww * s * img.height / img.width * vs * ky;
+        for (const [img, a, f] of frames) {
+          const sw = f < 0 ? img.width : img.width / RUN_FRAMES;
+          const dw = ww * s * kx, dh = ww * s * img.height / sw * vs * ky;
           ctx.globalAlpha = a;
-          ctx.drawImage(img, NOSE * 1.1 * s - dw, -dh, dw, dh); // alineado por la trompa: no salta al cambiar de pose
+          // alineado por la trompa: no salta al cambiar de pose
+          if (f < 0) ctx.drawImage(img, NOSE * 1.1 * s - dw, -dh, dw, dh);
+          else ctx.drawImage(img, f * sw, 0, sw, img.height, NOSE * 1.1 * s - dw, -dh, dw, dh);
         }
         ctx.globalAlpha = 1;
       } else {
