@@ -65,13 +65,16 @@ const FILES = {
   teroVuela: 'assets/carpincho/tero.webp',
 };
 const custom = {};
+// Las imágenes llevan la misma versión que los módulos (la pone tools/version.mjs en el import map de index.html),
+// así el celular no mezcla una imagen vieja del caché con código nuevo.
+const VERSION = new URL(import.meta.url).searchParams.get('v');
 
 export function loadCustomArt(onLoad) {
   for (const [k, src] of Object.entries(FILES)) {
     const im = new Image();
     im.onload = () => { custom[k] = im; if (onLoad) onLoad(k); };
     im.onerror = () => {};
-    im.src = src;
+    im.src = VERSION ? `${src}?v=${VERSION}` : src;
   }
 }
 

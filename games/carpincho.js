@@ -49,8 +49,11 @@ const TITLES = {
 // Imágenes del carpincho y el tero (assets/carpincho/); si no cargaron, se dibujan en código.
 // corre.webp: los 30 cuadros de un GIF (3 pasos de trote, 10 cuadros por paso, 1 paso por segundo en el original).
 // Se pasan por tiempo y no por distancia: arranca a 1,6 pasos por segundo y acelera poco, para que no parezca a las corridas.
-const RUN_FRAMES = 30, RUN_FPS = 16;
-const TERO_FRAMES = 9;                   // tero.webp: un aleteo completo en 9 cuadros, también sacado de un GIF
+const RUN_FPS = 16;
+// tero.webp: un aleteo completo en 9 cuadros, también sacado de un GIF.
+// La cantidad de cuadros se saca del tamaño de la tira (cada cuadro tiene esta forma), así no hay que tocar el código si cambia.
+const RUN_ASPECT = 240 / 171, TERO_ASPECT = 200 / 245;
+const frameCount = (img, aspect) => Math.max(1, Math.round(img.width / (img.height * aspect)));
 const IMG = () => ({
   corre: getCustom('carpCorre'),
   salto: getCustom('carpSalto'), agachado: getCustom('carpAgachado'),
@@ -115,7 +118,7 @@ export default {
     c.fillStyle = g; c.fillRect(0, 0, s, s);
     c.fillStyle = '#d9cbb0'; c.fillRect(0, s * 0.72, s, s * 0.12);
     const img = IMG().corre;
-    if (img) { const fw = img.width / RUN_FRAMES, w = s * 0.86, h = w * img.height / fw; c.drawImage(img, 0, 0, fw, img.height, (s - w) / 2, s * 0.8 - h, w, h); }
+    if (img) { const fw = img.width / frameCount(img, RUN_ASPECT), w = s * 0.86, h = w * img.height / fw; c.drawImage(img, 0, 0, fw, img.height, (s - w) / 2, s * 0.8 - h, w, h); }
     else { c.save(); c.translate(s * 0.48, s * 0.8); c.scale(s * 0.7, -s * 0.7); paintCarpincho(c, 0, false, false); c.restore(); }
   },
 
@@ -169,7 +172,7 @@ export default {
       S.startT += sec;
       const v = speed(S.d);
       S.d += v * sec;
-      if (S.y === 0 && !S.duckHeld) S.runF = (S.runF + sec * RUN_FPS * Math.pow(v / V0, 0.6)) % RUN_FRAMES;
+      if (S.y === 0 && !S.duckHeld) S.runF = (S.runF + sec * RUN_FPS * Math.pow(v / V0, 0.6)) % 3600;
       if (S.y > 0 || S.vy > 0) {
         S.vy -= G * (S.duckHeld ? 3 : 1) * sec;
         S.y += S.vy * sec;
@@ -612,7 +615,7 @@ export default {
           const img = IMG().tero;
           const [cx, cy] = P(ox + 0.25, 0.74, z + 0.05);
           if (img) {
-            const fw = img.width / TERO_FRAMES, f = Math.floor(now / 70) % TERO_FRAMES, w = 0.8 * s, h = w * img.height / fw;
+            const n = frameCount(img, TERO_ASPECT), fw = img.width / n, f = Math.floor(now / 70) % n, w = 0.8 * s, h = w * img.height / fw;
             ctx.drawImage(img, f * fw, 0, fw, img.height, cx - w / 2, cy - h * 0.62, w, h); // el cuerpo está a 0,62 del alto
           } else drawTeroCode(cx, cy, s, now);
           break;
@@ -682,7 +685,7 @@ export default {
       let frames = [], ww = 1.3, vs = 1;
       if (S.y > 0 && im.salto) frames = [[im.salto, 1, -1]];
       else if (S.duck && im.agachado) { frames = [[im.agachado, 1, -1]]; ww = 1.45; vs = 0.8; }
-      else if (im.corre) frames = [[im.corre, 1, Math.floor(S.runF) % RUN_FRAMES]];
+      else if (im.corre) frames = [[im.corre, 1, Math.floor(S.runF) % frameCount(im.corre, RUN_ASPECT)]];
       ctx.save();
       ctx.translate(sx, sy - 0.35 * s);
       if (S.crash) {
@@ -693,7 +696,7 @@ export default {
       ctx.translate(0, 0.35 * s);
       if (frames.length) {
         for (const [img, a, f] of frames) {
-          const sw = f < 0 ? img.width : img.width / RUN_FRAMES;
+          const sw = f < 0 ? img.width : img.width / frameCount(img, RUN_ASPECT);
           const dw = ww * s * kx, dh = ww * s * img.height / sw * vs * ky;
           ctx.globalAlpha = a;
           // alineado por la trompa: no salta al cambiar de pose
