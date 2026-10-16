@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Iguala el color de un dibujo al de otro (por ejemplo una pose suelta al de la tira de la carrera):
+     tools/igualar-color.html?src=../assets/nuevas/agachado-original.png&ref=../assets/carpincho/corre.webp
+     Compara el color promedio y el contraste de las partes opacas y corrige cada canal. El PNG queda en #out. -->
+<pre id="out"></pre>
+<script type="module">
+const q = new URLSearchParams(location.search), out = document.getElementById('out');
+const load = s => new Promise((r, e) => { const i = new Image(); i.onload = () => r(i); i.onerror = () => e(new Error('no se pudo abrir ' + s)); i.src = s; });
+const pixels = img => {
+  const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height }), g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  return { c, g, id: g.getImageData(0, 0, c.width, c.height) };
+};
+const stats = d => {
+  const m = [0, 0, 0], v = [0, 0, 0]; let n = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { n++; for (let k = 0; k < 3; k++) m[k] += d[i + k]; }
+  for (let k = 0; k < 3; k++) m[k] /= n;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) for (let k = 0; k < 3; k++) v[k] += (d[i + k] - m[k]) ** 2;
+  return { m, s: v.map(x => Math.sqrt(x / n)) };
+};
+try {
+  const [src, ref] = await Promise.all([load(q.get('src')), load(q.get('ref'))]);
+  const a = pixels(src), b = pixels(ref), sa = stats(a.id.data), sb = stats(b.id.data), d = a.id.data;
+  for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) d[i + k] = (d[i + k] - sa.m[k]) * (sb.s[k] / sa.s[k]) + sb.m[k];
+  a.g.putImageData(a.id, 0, 0);
+  out.textContent = 'PNG0:' + a.c.toDataURL('image/png') + ':FIN\nANTES ' + sa.m.map(Math.round) + ' REF ' + sb.m.map(Math.round);
+} catch (e) { out.textContent = 'ERROR: ' + e.message; }
+</script>

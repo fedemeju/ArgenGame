@@ -50,13 +50,14 @@ const TITLES = {
 // corre.webp: los 30 cuadros de un GIF (3 pasos de trote, 10 cuadros por paso, 1 paso por segundo en el original).
 // Se pasan por tiempo y no por distancia: arranca a 1,6 pasos por segundo y acelera poco, para que no parezca a las corridas.
 const RUN_FPS = 16;
+const JUMP_FRAME = 7;                    // cuadro de la carrera con las patas recogidas: es el del salto (mismo color y tamaño)
 // tero.webp: un aleteo completo en 9 cuadros, también sacado de un GIF.
 // La cantidad de cuadros se saca del tamaño de la tira (cada cuadro tiene esta forma), así no hay que tocar el código si cambia.
 const RUN_ASPECT = 240 / 171, TERO_ASPECT = 200 / 245;
 const frameCount = (img, aspect) => Math.max(1, Math.round(img.width / (img.height * aspect)));
 const IMG = () => ({
   corre: getCustom('carpCorre'),
-  salto: getCustom('carpSalto'), agachado: getCustom('carpAgachado'),
+  agachado: getCustom('carpAgachado'),
   tero: getCustom('teroVuela'),
 });
 
@@ -683,8 +684,8 @@ export default {
       if (S.duckT > 0) ky *= 1 + 0.25 * S.duckT / 0.12;
       // cada frame: [imagen, transparencia, cuadro de la tira (o -1 si es una imagen sola)]
       let frames = [], ww = 1.3, vs = 1;
-      if (S.y > 0 && im.salto) frames = [[im.salto, 1, -1]];
-      else if (S.duck && im.agachado) { frames = [[im.agachado, 1, -1]]; ww = 1.45; vs = 0.8; }
+      if (S.y > 0 && im.corre) frames = [[im.corre, 1, JUMP_FRAME % frameCount(im.corre, RUN_ASPECT)]];
+      else if (S.duck && im.agachado) { frames = [[im.agachado, 1, -1]]; ww = 1.3; vs = 0.8; }
       else if (im.corre) frames = [[im.corre, 1, Math.floor(S.runF) % frameCount(im.corre, RUN_ASPECT)]];
       ctx.save();
       ctx.translate(sx, sy - 0.35 * s);

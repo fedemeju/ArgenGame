@@ -14,6 +14,7 @@ const q = new URLSearchParams(location.search);
 if (q.get('propias') !== 'no') { loadCustomArt(); await new Promise(r => setTimeout(r, 600)); }
 const game = GAMES[q.get('juego') || 'carpincho'];
 const inst = game.mount(document.getElementById('g'), { seed: Number(q.get('seed') || 3), onScore() {}, onEnd() {} });
+window.__inst = inst; // para revisar desde la consola
 const steps = Number(q.get('pasos') || 0), acc = q.get('accion');
 if (steps) {
   if (inst._press) inst._press('jump', false); else inst._move(0);

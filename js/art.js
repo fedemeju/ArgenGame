@@ -61,7 +61,7 @@ const FILES = {
   mate: 'assets/mate.png', empa: 'assets/empanada.png', alfa: 'assets/alfajor.png', head: 'assets/cabeza.png',
   fitito: 'assets/fitito.png',
   carpCorre: 'assets/carpincho/corre.webp',
-  carpSalto: 'assets/carpincho/salto.png', carpAgachado: 'assets/carpincho/agachado.png',
+  carpAgachado: 'assets/carpincho/agachado.png',
   teroVuela: 'assets/carpincho/tero.webp',
 };
 const custom = {};
