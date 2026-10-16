@@ -48,7 +48,9 @@ export default {
     c.fillStyle = g; c.fillRect(0, 0, s, s);
     c.fillStyle = '#4a4d53';
     c.beginPath(); c.moveTo(s * 0.47, s * 0.5); c.lineTo(s * 0.53, s * 0.5); c.lineTo(s * 1.05, s); c.lineTo(-s * 0.05, s); c.closePath(); c.fill();
-    c.save(); c.translate(s * 0.5, s * 0.95); c.scale(s * 0.32, -s * 0.32); paintFitito(c, 0); c.restore();
+    const own = getCustom('fititoAtras');
+    if (own) { const w = s * 0.62, h = w * own.height / own.width; c.drawImage(own, (s - w) / 2, s * 0.97 - h, w, h); }
+    else { c.save(); c.translate(s * 0.5, s * 0.95); c.scale(s * 0.32, -s * 0.32); paintFitito(c, 0); c.restore(); }
   },
 
   mount(el, { seed, onScore, onEnd }) {
@@ -490,7 +492,8 @@ export default {
       ellipse(sx, sy, 1.15 * s, 0.25 * s, 'rgba(10,10,15,.4)');
       ctx.save(); ctx.translate(sx, sy); ctx.rotate(rot);
       const own = getCustom('fititoAtras');
-      if (own) { const w = 2.1 * s, h = w * own.height / own.width; ctx.drawImage(own, -w / 2, -h, w, h); }
+      // imagen del dueño: el ancho con paragolpes es un poco más que el auto (CAR_W)
+      if (own) { const w = CAR_W * ROAD / M * 1.08 * s, h = w * own.height / own.width; ctx.drawImage(own, -w / 2, -h, w, h); }
       else { ctx.scale(s, -s); paintFitito(ctx, now); }
       ctx.restore();
     }
