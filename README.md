@@ -43,6 +43,7 @@ La `apiKey` de Firebase para web es pública por diseño; lo que protege los dat
 | `js/art.js` | Dibujos provisorios y carga de imágenes de `assets/` |
 | `games/` | Un archivo por minijuego; `games/index.js` dice cuáles entran en el sorteo |
 | `firestore.rules` | Reglas de seguridad de Firestore |
+| `tools/version.mjs` | Pone versión nueva a los archivos para que los celulares no usen los viejos del caché. Correr `node tools/version.mjs` antes de cada subida |
 
 ### Sumar un minijuego
 
