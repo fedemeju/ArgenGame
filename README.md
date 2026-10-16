@@ -44,7 +44,6 @@ Cada amigo entra sin cuenta, solo con su nombre (login anónimo). En el inicio t
 | `js/data.js` | Guardado: Firebase o modo prueba local |
 | `js/engine.js` | Herramientas para los juegos: azar con semilla, canvas, controles, sonido |
 | `js/art.js` | Dibujos provisorios y carga de imágenes de `assets/` |
-| `js/pixel.js` | Herramientas para dibujar pixel art en código (rectángulos, óvalos, contorno, letra de 3x5) |
 | `games/` | Un archivo por minijuego; `games/index.js` dice cuáles entran en el sorteo |
 | `firestore.rules` | Reglas de seguridad de Firestore |
 | `tools/version.mjs` | Pone versión nueva a los archivos para que los celulares no usen los viejos del caché. Correr `node tools/version.mjs` antes de cada subida |
@@ -61,7 +60,7 @@ Después se agrega a la lista de `games/index.js`. Usar siempre el `seed` para e
 
 - [x] **Imágenes propias** de mate, empanada, alfajor y cabeza de la víbora (en `assets/`).
 - [x] El Fitito en la Panamericana (`games/fitito.js`).
-- [x] El Fitito en pixel art, con la ruta recta y el paisaje argento (`games/fitito-art.js`).
+- [x] El Fitito en 2.5D, con la ruta recta, bruma y el paisaje argento.
 - [x] Conectar Firebase.
 - [x] El Carpincho de Nordelta (`games/carpincho.js`): corredor en 2.5D, saltar y agacharse.
 - [ ] **Más juegos**: con las ideas del usuario. `games/torre.js` (Torre de Alfajores) está escrito pero fuera del sorteo.

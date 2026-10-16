@@ -59,7 +59,6 @@ export const PAINT = {
 
 const FILES = {
   mate: 'assets/mate.png', empa: 'assets/empanada.png', alfa: 'assets/alfajor.png', head: 'assets/cabeza.png',
-  fitito: 'assets/fitito.png',
   carpCorre: 'assets/carpincho/corre.webp',
   carpAgachado: 'assets/carpincho/agachado.png',
   teroVuela: 'assets/carpincho/tero.webp',
