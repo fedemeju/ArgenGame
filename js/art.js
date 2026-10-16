@@ -60,10 +60,10 @@ export const PAINT = {
 const FILES = { mate: 'assets/mate.png', empa: 'assets/empanada.png', alfa: 'assets/alfajor.png', head: 'assets/cabeza.png' };
 const custom = {};
 
-export function loadCustomArt() {
+export function loadCustomArt(onLoad) {
   for (const [k, src] of Object.entries(FILES)) {
     const im = new Image();
-    im.onload = () => { custom[k] = im; };
+    im.onload = () => { custom[k] = im; if (onLoad) onLoad(k); };
     im.onerror = () => {};
     im.src = src;
   }

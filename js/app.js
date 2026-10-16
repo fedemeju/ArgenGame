@@ -487,7 +487,7 @@ async function showResult(game, rk, score, info) {
 
 /* ---------- arranque ---------- */
 (async () => {
-  loadCustomArt();
+  loadCustomArt(() => paintIcons());
   try {
     api = await connect();
   } catch (e) {

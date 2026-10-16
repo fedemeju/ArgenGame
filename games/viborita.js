@@ -28,11 +28,17 @@ export default {
     const path = () => { c.beginPath(); c.moveTo(16, 84); c.bezierCurveTo(16, 50, 56, 74, 54, 46); c.bezierCurveTo(52, 24, 30, 30, 34, 16); };
     path(); c.strokeStyle = SNAKE_DARK; c.lineWidth = 20; c.stroke();
     path(); c.strokeStyle = SNAKE; c.lineWidth = 13; c.stroke();
-    c.fillStyle = SNAKE_DARK; circle(c, 36, 15, 12); c.fillStyle = SNAKE_HEAD; circle(c, 36, 15, 9.5);
-    c.fillStyle = '#fff'; circle(c, 32, 12, 3); circle(c, 41, 12, 3);
-    c.fillStyle = INK; circle(c, 32, 11, 1.5); circle(c, 41, 11, 1.5);
+    const head = getCustom('head');
+    if (head) c.drawImage(head, 14, -4, 42, 42);
+    else {
+      c.fillStyle = SNAKE_DARK; circle(c, 36, 15, 12); c.fillStyle = SNAKE_HEAD; circle(c, 36, 15, 9.5);
+      c.fillStyle = '#fff'; circle(c, 32, 12, 3); circle(c, 41, 12, 3);
+      c.fillStyle = INK; circle(c, 32, 11, 1.5); circle(c, 41, 11, 1.5);
+    }
     c.restore();
-    c.save(); c.translate(s * 0.52, s * 0.5); PAINT.mate(c, s * 0.46); c.restore();
+    const mate = getCustom('mate');
+    if (mate) c.drawImage(mate, s * 0.5, s * 0.48, s * 0.5, s * 0.5);
+    else { c.save(); c.translate(s * 0.52, s * 0.5); PAINT.mate(c, s * 0.46); c.restore(); }
   },
 
   mount(el, { seed, onScore, onEnd }) {
@@ -216,8 +222,11 @@ export default {
 
       const h = pts[0], d = S.dir, head = getCustom('head');
       if (head) {
-        ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(Math.atan2(d.y, d.x));
-        ctx.drawImage(head, -cell * 0.6, -cell * 0.6, cell * 1.2, cell * 1.2);
+        // La cabeza propia está de frente: siempre derecha, espejada cuando va a la izquierda.
+        const hs = cell * 1.45;
+        ctx.save(); ctx.translate(h.x, h.y - cell * 0.12);
+        if (d.x < 0) ctx.scale(-1, 1);
+        ctx.drawImage(head, -hs / 2, -hs / 2, hs, hs);
         ctx.restore();
       } else {
         if (S.alive && Math.floor(now / 700) % 4 === 0) {
