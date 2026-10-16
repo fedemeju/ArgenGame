@@ -8,8 +8,15 @@ const Z0 = 7;                            // profundidad del sendero por donde co
 const PATH_NEAR = 6.2, PATH_FAR = 7.8;
 const H_UP = 0.7, H_DOWN = 0.45;         // alto del carpincho parado y agachado
 const NOSE = 0.55, TAIL = 0.5;           // del centro a la trompa y a la cola
-const G = 26, JUMP_V = 7.4, AIR = 2 * JUMP_V / G;
-const V0 = 5.5, VMAX = 10, K = 0.0075, DCAP = (VMAX - V0) / K;
+const G = 22, JUMP_V = 7, AIR = 2 * JUMP_V / G;
+const V0 = 4.8, VMAX = 9.5, K = 0.006, DCAP = (VMAX - V0) / K;
+const JUMP_BUFFER = 0.15;                // si tocás saltar un poco antes de caer, salta al tocar el piso
+const NIGHT_AT = 250, NIGHT_LEN = 200;   // a los 250 m empieza a oscurecer; a los 450 m es de noche
+const SKY_DAY = ['#2c4b82', '#9f86a8', '#f2a982', '#ffdca4'], SKY_NIGHT = ['#070b22', '#141a45', '#2a2d5e', '#463f72'];
+const mix = (a, b, t) => {
+  const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), x = p(a), y = p(b);
+  return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`;
+};
 const speed = d => (d < DCAP ? V0 + K * d : VMAX);
 // tiempo que tarda en recorrer d (sirve para que los que vuelan lleguen igual en todos los celulares)
 const tOf = d => (d < DCAP ? Math.log(1 + K * d / V0) / K : Math.log(1 + K * DCAP / V0) / K + (d - DCAP) / VMAX);
@@ -23,7 +30,7 @@ const KINDS = {
   tacho: { low: 1, w: [0.5, 0.5], y1: 0.62, peso: 2 },
   barrera: { high: 1, w: [0.22, 0.22], y0: 0.52, y1: 0.62, peso: 3 },
   pelota: { high: 1, w: [0.18, 0.18], y0: 0.51, y1: 0.69, vx: 2.2, peso: 2 },
-  tero: { high: 1, w: [0.5, 0.5], y0: 0.56, y1: 0.8, vx: 1.2, peso: 3 },
+  tero: { high: 1, w: [0.5, 0.5], y0: 0.58, y1: 0.86, vx: 1.2, peso: 3 },
   dron: { high: 1, w: [0.55, 0.55], y0: 0.55, y1: 0.68, peso: 2 },
 };
 const LOWS = Object.keys(KINDS).filter(k => KINDS[k].low);
@@ -89,13 +96,13 @@ export default {
   id: 'carpincho',
   name: 'El Carpincho de Nordelta',
   tagline: 'Saltá y agachate por el barrio cerrado',
-  threshold: 3,
+  threshold: 20,
   rules: [
     'El carpincho se metió al barrio cerrado y corre solo, cada vez más rápido.',
     'Tocá la mitad derecha de la pantalla para saltar los setos, conos, tachos y lomos de burro.',
-    'Mantené apretada la mitad izquierda para agacharte: pasan la barrera de la guardia, pelotas de golf, teros y drones.',
+    'Mantené apretada la mitad izquierda para agacharte: la barrera de la guardia, las pelotas de golf, los teros y los drones solo se pasan agachado.',
     'Si te agachás en el aire, bajás más rápido.',
-    'Cada obstáculo que dejás atrás suma 1 punto.',
+    'Cada metro que corrés suma 1 punto.',
   ],
   icon(c, s) {
     const g = c.createLinearGradient(0, 0, 0, s);
@@ -117,17 +124,20 @@ export default {
     const S = {
       d: 0, y: 0, vy: 0, duck: false, duckHeld: false, started: false, alive: true, score: 0,
       landT: 0, startT: 0, obs: [], nextX: 16, spawned: 0, crash: null, shake: 0, parts: [], dustT: 0,
+      jumpBuf: 0, rot: 0, duckT: 0,
     };
     let endTimer = 0;
-    const report = () => onScore(S.score, `Esquivados · ${Math.floor(S.d)} m`);
+    const report = () => onScore(S.score, `Metros · ${(speed(S.d) * 3.6).toFixed(0)} km/h`);
     const obsX = o => o.X + (o.vx ? o.vx * (tOf(o.X) - tOf(S.d)) : 0);
 
     // Obstáculos por distancia: siempre hay lugar para aterrizar y volver a saltar.
     function spawnUntil(limit) {
       while (S.nextX < limit) {
         const n = S.spawned++, v = speed(S.nextX);
-        const highP = n < 6 ? 0 : Math.min(0.42, 0.18 + n * 0.008);
-        const kind = rng() < highP ? pickW(HIGHS, rng()) : pickW(LOWS, rng());
+        // los de agacharse arrancan en el tercero, y el primero siempre es un tero
+        const highP = n < 2 ? 0 : n === 2 ? 1 : Math.min(0.42, 0.22 + n * 0.008);
+        let kind = rng() < highP ? pickW(HIGHS, rng()) : pickW(LOWS, rng());
+        if (KINDS[kind].high && !S.teroVisto) { kind = 'tero'; S.teroVisto = true; }
         const k = KINDS[kind], w = k.w[0] + rng() * (k.w[1] - k.w[0]);
         S.obs.push({ kind, id: n, X: S.nextX, w, y0: k.y0 || 0, y1: k.y1, vx: k.vx || 0, low: !!k.low, passed: false });
         const extra = 0.4 + 1.2 * Math.max(0, 1 - n / 60);
@@ -157,23 +167,34 @@ export default {
       if (S.y > 0 || S.vy > 0) {
         S.vy -= G * (S.duckHeld ? 3 : 1) * sec;
         S.y += S.vy * sec;
-        if (S.y <= 0) { S.y = 0; S.vy = 0; S.landT = 0.12; dust(6, 0.6); }
+        if (S.y <= 0) {
+          S.y = 0; S.vy = 0; S.landT = 0.18; dust(6, 0.6);
+          if (S.jumpBuf > 0 && !S.duckHeld) jump();
+        }
       }
-      if (S.landT > 0) S.landT -= sec;
+      if (S.jumpBuf > 0) S.jumpBuf -= sec;
+      if (S.landT > 0) S.landT = Math.max(0, S.landT - sec);
+      const wasDuck = S.duck;
       S.duck = S.duckHeld && S.y === 0;
+      if (S.duck && !wasDuck) S.duckT = 0.12;
+      if (S.duckT > 0) S.duckT = Math.max(0, S.duckT - sec);
       if (S.y === 0 && !S.duck) { S.dustT -= sec; if (S.dustT <= 0) { S.dustT = 0.09; dust(1, 0.2); } }
 
       spawnUntil(S.d + 40);
-      const top = S.y + (S.duck ? H_DOWN : H_UP) * 0.95;
-      const px0 = S.d - TAIL * 0.85, px1 = S.d + NOSE * 0.9;
+      // cajas de choque un poco más chicas que los dibujos, para que no se sienta injusto
+      const top = S.y + (S.duck ? H_DOWN : H_UP) * 0.92;
+      const px0 = S.d - TAIL * 0.7, px1 = S.d + NOSE * 0.78;
+      if (!S.nocheAvisada && S.d > NIGHT_AT + NIGHT_LEN * 0.5) { S.nocheAvisada = true; flash(toast, '¡Se hizo de noche!'); }
+      const meters = Math.floor(S.d);
+      if (meters !== S.score) {
+        if (Math.floor(meters / 100) > Math.floor(S.score / 100)) { flash(toast, `¡${Math.floor(meters / 100) * 100} m!`); audio.win(); }
+        S.score = meters;
+      }
       for (const o of S.obs) {
-        const ox = obsX(o), m = o.w * 0.06;
-        if (px1 > ox + m && px0 < ox + o.w - m && top > o.y0 && S.y < o.y1 * 0.95) return die(o.kind);
-        if (!o.passed && ox + o.w < px0) {
-          o.passed = true; S.score++;
-          audio.tone(880, 0.05, 'triangle', 0.04);
-          if (S.score % 25 === 0) { flash(toast, `¡${S.score}!`); audio.win(); }
-        }
+        const ox = obsX(o), m = o.w * 0.12;
+        // los que vuelan no se pueden saltar: chocan con todo lo que esté arriba de su parte de abajo
+        if (px1 > ox + m && px0 < ox + o.w - m && top > o.y0 + 0.02 && (!o.low || S.y < o.y1 * 0.9)) return die(o.kind);
+        if (!o.passed && ox + o.w < px0) { o.passed = true; audio.tone(880, 0.04, 'triangle', 0.03); }
         if (o.kind === 'tero' && !o.chirp && ox - S.d < 6) { o.chirp = true; audio.tone(1900, 0.05, 'square', 0.03); audio.tone(2100, 0.05, 'square', 0.03, 0.09); }
       }
       S.obs = S.obs.filter(o => obsX(o) + o.w > S.d - 14);
@@ -217,18 +238,27 @@ export default {
       return items.sort((a, b) => b.z - a.z);
     }
 
+    // 0 = atardecer, 1 = noche cerrada; y las luces que se prenden de noche (se juntan al dibujar)
+    let night = 0, lights = [];
+
     function drawSky(now) {
       const g = ctx.createLinearGradient(0, 0, 0, yh);
-      g.addColorStop(0, '#2c4b82'); g.addColorStop(0.45, '#9f86a8'); g.addColorStop(0.8, '#f2a982'); g.addColorStop(1, '#ffdca4');
+      [0, 0.45, 0.8, 1].forEach((t, i) => g.addColorStop(t, mix(SKY_DAY[i], SKY_NIGHT[i], night)));
       ctx.fillStyle = g; ctx.fillRect(-30, -30, W + 60, yh + 31);
-      const sx = W * 0.72, sy = yh - H * 0.045, r = Math.min(W, H) * 0.065;
-      let rg = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 6);
-      rg.addColorStop(0, 'rgba(255,232,170,.6)'); rg.addColorStop(1, 'rgba(255,200,140,0)');
-      ctx.fillStyle = rg; ctx.fillRect(sx - r * 6, sy - r * 6, r * 12, r * 12);
-      rg = ctx.createRadialGradient(sx - r * 0.2, sy - r * 0.2, 0, sx, sy, r);
-      rg.addColorStop(0, '#fffbe6'); rg.addColorStop(1, '#ffd27e');
-      ellipse(sx, sy, r, r, rg);
+      // el sol se esconde detrás del horizonte
+      const sx = W * 0.72, sy = yh - H * 0.045 + night * H * 0.12, r = Math.min(W, H) * 0.065;
+      if (night < 1) {
+        ctx.save(); ctx.globalAlpha = 1 - night;
+        let rg = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 6);
+        rg.addColorStop(0, 'rgba(255,232,170,.6)'); rg.addColorStop(1, 'rgba(255,200,140,0)');
+        ctx.fillStyle = rg; ctx.fillRect(sx - r * 6, sy - r * 6, r * 12, r * 12);
+        rg = ctx.createRadialGradient(sx - r * 0.2, sy - r * 0.2, 0, sx, sy, r);
+        rg.addColorStop(0, '#fffbe6'); rg.addColorStop(1, '#ffd27e');
+        ellipse(sx, sy, r, r, rg);
+        ctx.restore();
+      }
       // nubes lejanas que se mueven apenas
+      ctx.save(); ctx.globalAlpha = 1 - night * 0.65;
       for (let i = 0; i < 4; i++) {
         const span = W * 1.8, x = ((i * 0.47 * span - camX * F / 400 - now * 0.004 * (i + 1)) % span + span) % span - W * 0.4;
         const y = yh * (0.14 + i * 0.13), k = Math.min(W, H) * (0.07 + i * 0.012);
@@ -237,6 +267,46 @@ export default {
         ellipse(x + k * 0.3, y - k * 0.12, k * 0.95, k * 0.5, 'rgba(255,238,228,.75)');
         ellipse(x + k * 1.1, y + k * 0.05, k * 0.6, k * 0.3, 'rgba(255,232,222,.7)');
       }
+      ctx.restore();
+    }
+
+    // De noche: oscurece todo y después prende luna, estrellas, faroles, ventanas y luciérnagas.
+    function drawNight(now) {
+      if (night <= 0) return;
+      ctx.fillStyle = `rgba(8,12,40,${0.5 * night})`; ctx.fillRect(-30, -30, W + 60, H + 60);
+      ctx.save();
+      ctx.globalAlpha = night;
+      for (let i = 0; i < 70; i++) {
+        const x = (hash3(i, 1, 5) % 1000) / 1000 * W, y = (hash3(i, 2, 5) % 1000) / 1000 * yh * 0.85;
+        const a = 0.5 + 0.5 * Math.sin(now * 0.002 + i * 1.3), r = (hash3(i, 3, 5) % 3) * 0.4 + 0.6;
+        ellipse(x, y, r, r, `rgba(255,255,240,${a})`);
+      }
+      const mx = W * 0.24, my = yh * 0.32, mr = Math.min(W, H) * 0.05;
+      let g = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 5);
+      g.addColorStop(0, 'rgba(200,215,255,.35)'); g.addColorStop(1, 'rgba(200,215,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(mx - mr * 5, my - mr * 5, mr * 10, mr * 10);
+      g = ctx.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, mr * 0.1, mx, my, mr);
+      g.addColorStop(0, '#fbfaf2'); g.addColorStop(1, '#d9d6c6');
+      ellipse(mx, my, mr, mr, g);
+      ellipse(mx + mr * 0.3, my + mr * 0.2, mr * 0.18, mr * 0.15, 'rgba(150,150,140,.35)');
+      ellipse(mx - mr * 0.35, my - mr * 0.1, mr * 0.12, mr * 0.1, 'rgba(150,150,140,.3)');
+      ctx.globalCompositeOperation = 'lighter';
+      for (const L of lights) {
+        const gl = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.r);
+        gl.addColorStop(0, `rgba(${L.c},${L.a * night})`); gl.addColorStop(1, `rgba(${L.c},0)`);
+        ctx.fillStyle = gl; ctx.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2);
+      }
+      // luciérnagas en el pasto
+      const syBank = P(0, 0, 30.4)[1];
+      for (let i = 0; i < 16; i++) {
+        const x = ((hash3(i, 7, 1) % 1000) / 1000 * W * 1.4 - (camX * F / 60) % (W * 1.4) + W * 1.4) % (W * 1.4) - W * 0.2 + Math.sin(now * 0.0011 + i) * 14;
+        const y = syBank + (H - syBank) * ((hash3(i, 8, 1) % 1000) / 1000) + Math.cos(now * 0.0013 + i * 2) * 10;
+        const a = Math.max(0, Math.sin(now * 0.003 + i * 2.3)) * night, r = 7;
+        const gf = ctx.createRadialGradient(x, y, 0, x, y, r);
+        gf.addColorStop(0, `rgba(230,255,120,${a})`); gf.addColorStop(1, 'rgba(230,255,120,0)');
+        ctx.fillStyle = gf; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+      ctx.restore();
     }
 
     function drawWater(items, now) {
@@ -306,6 +376,13 @@ export default {
           ctx.fillStyle = 'rgba(255,214,170,.35)'; ctx.fillRect(cx - (cx - ax) * 0.22, ay, (cx - ax) * 0.22, by - ay);
           ctx.fillStyle = 'rgba(255,255,255,.14)';
           for (let y = 0.6; y < it.h; y += 0.8) ctx.fillRect(ax, P(0, y, it.z)[1], cx - ax, 1);
+          if (night > 0) {
+            // ventanas prendidas de noche (se dibujan acá para que lo de adelante las tape)
+            const tw = cx - ax, cw = Math.max(1, tw / 6), ch = Math.max(1, cw * 0.8), seed = Math.round(it.x * 10);
+            ctx.fillStyle = `rgba(16,20,46,${0.75 * night})`; ctx.fillRect(ax, ay, tw, by - ay);
+            ctx.fillStyle = `rgba(255,222,150,${night})`;
+            for (let r = 0; r * ch * 2 < by - ay - ch; r++) for (let c = 0; c < 5; c++) if (!(hash3(seed, r, c) % 3)) ctx.fillRect(ax + cw * 0.5 + c * cw * 1.1, ay + ch + r * ch * 2, cw * 0.6, ch);
+          }
           break;
         }
         case 'barco': {
@@ -339,6 +416,7 @@ export default {
         case 'farol': {
           const [, ly] = P(it.x, 1.66, it.z);
           ellipse(bx, by, 1.1 * k, 0.22 * k, 'rgba(255,214,150,.16)');
+          if (night > 0) lights.push({ t: 'glow', x: bx, y: ly, r: 1.4 * k, c: '255,200,120', a: 0.45 }, { t: 'glow', x: bx, y: by, r: 1.1 * k, c: '255,210,140', a: 0.2 });
           ctx.strokeStyle = '#2b2b31'; ctx.lineWidth = Math.max(1, 0.06 * k);
           ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, ly); ctx.stroke();
           box(it.x - 0.13, it.x + 0.13, 1.62, 1.8, it.z - 0.13, it.z + 0.13, { front: '#2b2b31', side: '#202026', top: '#3a3a42' });
@@ -385,6 +463,7 @@ export default {
           box(it.x - 0.06, it.x + 0.06, 0, 0.32, it.z - 0.06, it.z + 0.06, { front: '#2f3036', side: '#25262b', top: '#3d3e45' });
           const [lx, ly] = P(it.x, 0.28, it.z - 0.07);
           ctx.fillStyle = '#ffe2a2'; ctx.fillRect(lx - 0.05 * k, ly, 0.1 * k, 0.04 * k);
+          if (night > 0) lights.push({ t: 'glow', x: lx, y: ly, r: 0.45 * k, c: '255,210,140', a: 0.4 });
           ellipse(bx, by, 0.4 * k, 0.1 * k, 'rgba(255,214,150,.2)');
           break;
         }
@@ -420,6 +499,7 @@ export default {
       wins.forEach(([u0, u1, v0, v1], i) => {
         const a = P(x + w * u0, h * v1, z - 0.01), b = P(x + w * u1, h * v0, z - 0.01);
         const lit = (it.luz >> i) & 1;
+        if (lit && night > 0) lights.push({ t: 'glow', x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, r: Math.max(b[0] - a[0], b[1] - a[1]), c: '255,190,110', a: 0.3 });
         const g = ctx.createLinearGradient(0, a[1], 0, b[1]);
         if (lit) { g.addColorStop(0, '#ffe1a6'); g.addColorStop(1, '#f2a85c'); } else { g.addColorStop(0, '#b9cbe0'); g.addColorStop(0.6, '#e8cfae'); g.addColorStop(1, '#7c8ba3'); }
         ctx.fillStyle = '#3d3a37'; ctx.fillRect(a[0] - 0.05 * k, a[1] - 0.05 * k, b[0] - a[0] + 0.1 * k, b[1] - a[1] + 0.1 * k);
@@ -517,11 +597,11 @@ export default {
           break;
         }
         case 'tero': {
-          if (part !== 'front') return;
+          if (part !== 'back') return; // por detrás del carpincho: las alas bajan sin atravesarlo
           const frames = IMG().tero;
-          const [cx, cy] = P(ox + 0.25, 0.68, z);
+          const [cx, cy] = P(ox + 0.25, 0.74, z + 0.05);
           if (frames.length) {
-            const img = frames[Math.floor(now / 110) % frames.length], w = 0.62 * s, h = w * img.height / img.width;
+            const img = frames[Math.floor(now / 110) % frames.length], w = 0.8 * s, h = w * img.height / img.width;
             ctx.drawImage(img, cx - w / 2, cy - h * 0.5, w, h);
           } else drawTeroCode(cx, cy, s, now);
           break;
@@ -572,24 +652,48 @@ export default {
     }
 
     /* ---------- el carpincho ---------- */
-    function drawPlayer(now) {
-      const s = F / Z0, [sx, sy] = P(S.d, S.y, Z0), im = IMG();
-      let img = null, ww = 1.3, vs = 1;
-      if (S.y > 0 && im.salto) img = im.salto;
-      else if (S.duck && im.agachado) { img = im.agachado; ww = 1.45; vs = 0.8; }
-      else if (im.corre.length) img = im.corre[S.started && S.alive ? Math.floor(S.d * 1.8) % im.corre.length : 0];
+    function drawPlayer(now, dt) {
+      const s = F / Z0, im = IMG();
+      const running = S.started && S.alive && S.y === 0 && !S.duck;
+      const phase = (S.d * 0.9) % 1, wave = Math.sin(phase * 2 * Math.PI);
+      // galope: sube y baja una vez por paso y se mece apenas
+      const bob = running ? (1 - Math.cos(phase * 2 * Math.PI)) * 0.5 * 0.045 : 0;
+      const [sx, sy] = P(S.d, S.y + bob, Z0);
+      // en el aire se inclina siguiendo la velocidad, sin saltos bruscos
+      const targetRot = S.y > 0 ? Math.max(-0.22, Math.min(0.22, -S.vy * 0.03)) : 0;
+      S.rot += (targetRot - S.rot) * Math.min(1, dt / 70);
+      // se estira al subir y bajar rápido, y se aplasta un instante al caer o al agacharse
+      let kx = 1, ky = 1;
+      if (S.y > 0) { const u = Math.min(1, Math.abs(S.vy) / JUMP_V); ky = 1 + 0.07 * u; kx = 1 - 0.05 * u; }
+      if (S.landT > 0) { const e = Math.sin(S.landT / 0.18 * Math.PI / 2); ky *= 1 - 0.13 * e; kx *= 1 + 0.09 * e; }
+      if (S.duckT > 0) ky *= 1 + 0.25 * S.duckT / 0.12;
+      let frames = [], ww = 1.3, vs = 1;
+      if (S.y > 0 && im.salto) frames = [[im.salto, 1]];
+      else if (S.duck && im.agachado) { frames = [[im.agachado, 1]]; ww = 1.45; vs = 0.8; }
+      else if (im.corre.length) {
+        if (!running) frames = [[im.corre[0], 1]];
+        else {
+          // dos cuadros que se funden al final de cada medio paso
+          const half = phase * 2, f = Math.floor(half) % im.corre.length, local = half % 1;
+          frames = [[im.corre[f], 1]];
+          if (local > 0.7) frames.push([im.corre[(f + 1) % im.corre.length], (local - 0.7) / 0.3]);
+        }
+      }
       ctx.save();
-      ctx.translate(sx, sy);
+      ctx.translate(sx, sy - 0.35 * s);
       if (S.crash) {
         const t = Math.min(1, S.crash.t / 450);
         ctx.translate(-0.2 * s * t, -Math.sin(t * Math.PI) * 0.4 * s);
         ctx.rotate(-t * 0.9);
-      } else if (S.y > 0) ctx.rotate(Math.max(-0.2, Math.min(0.2, -S.vy * 0.025)));
-      let kx = 1, ky = 1;
-      if (S.landT > 0) { kx = 1.05; ky = 0.92; }
-      if (img) {
-        const dw = ww * s * kx, dh = dw * img.height / img.width * vs * ky;
-        ctx.drawImage(img, -dw / 2, -dh, dw, dh);
+      } else ctx.rotate(S.rot + (running ? wave * 0.025 : 0));
+      ctx.translate(0, 0.35 * s);
+      if (frames.length) {
+        for (const [img, a] of frames) {
+          const dw = ww * s * kx, dh = ww * s * img.height / img.width * vs * ky;
+          ctx.globalAlpha = a;
+          ctx.drawImage(img, NOSE * 1.1 * s - dw, -dh, dw, dh); // alineado por la trompa: no salta al cambiar de pose
+        }
+        ctx.globalAlpha = 1;
       } else {
         ctx.scale(s * kx, -s * ky * (S.duck ? 0.65 : 1));
         paintCarpincho(ctx, S.d * 9, S.y > 0, S.duck);
@@ -636,6 +740,8 @@ export default {
       if (S.crash) S.crash.t += dt;
 
       const items = sceneItems();
+      night = Math.max(0, Math.min(1, (S.d - NIGHT_AT) / NIGHT_LEN));
+      lights = [];
       drawSky(now);
       const syBank = drawWater(items, now);
       drawGround(syBank);
@@ -643,7 +749,8 @@ export default {
       for (; i < items.length && items[i].z > 15; i++) drawItem(items[i], now);
       // bruma: lo lejano se ve más claro y cálido
       const hz = ctx.createLinearGradient(0, yh, 0, P(0, 0, 13)[1]);
-      hz.addColorStop(0, 'rgba(255,214,176,.38)'); hz.addColorStop(1, 'rgba(255,214,176,0)');
+      const hc = mix('#ffd6b0', '#28325c', night).slice(4, -1);
+      hz.addColorStop(0, `rgba(${hc},.38)`); hz.addColorStop(1, `rgba(${hc},0)`);
       ctx.fillStyle = hz; ctx.fillRect(-30, yh, W + 60, P(0, 0, 13)[1] - yh);
       for (; i < items.length && items[i].z > PATH_FAR; i++) drawItem(items[i], now);
 
@@ -654,10 +761,11 @@ export default {
       for (const p of S.parts) { const [x, y] = P(p.x, p.y, p.z), a = 1 - p.t / p.life; ellipse(x, y, (0.04 + p.t * 0.12) * F / Z0, (0.03 + p.t * 0.08) * F / Z0, `rgba(222,205,170,${0.5 * a})`); }
       for (const [o, x] of vis) drawObstacle(o, x, 'back', now);
       for (const [o, x] of vis) drawObstacle(o, x, 'mid', now);
-      drawPlayer(now);
+      drawPlayer(now, dt);
       for (const [o, x] of vis) drawObstacle(o, x, 'front', now);
 
       for (; i < items.length; i++) drawItem(items[i], now);
+      drawNight(now);
 
       // viñeta para darle profundidad
       const vg = ctx.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.4, W / 2, H * 0.55, Math.max(W, H) * 0.85);
@@ -668,10 +776,14 @@ export default {
     }
 
     /* ---------- controles: mitad derecha salta, mitad izquierda (apretada) agacha ---------- */
+    function jump() {
+      S.vy = JUMP_V; S.y = 0.0001; S.duckHeld = false; S.jumpBuf = 0;
+      audio.tone(380, 0.14, 'triangle', 0.08, 0, 720); buzz(10);
+    }
     function press(kind, on) {
       if (!S.alive) return;
       if (!S.started) { S.started = true; pill.hidden = true; }
-      if (kind === 'jump' && on && S.y === 0) { S.vy = JUMP_V; S.y = 0.0001; S.duckHeld = false; audio.tone(380, 0.14, 'triangle', 0.08, 0, 720); buzz(10); }
+      if (kind === 'jump' && on) { if (S.y === 0) jump(); else S.jumpBuf = JUMP_BUFFER; }
       if (kind === 'duck') { if (on && !S.duckHeld) audio.tone(240, 0.07, 'triangle', 0.05, 0, 160); S.duckHeld = on; }
     }
     let duckPointer = null;
@@ -708,7 +820,7 @@ export default {
         window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp);
         window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey);
       },
-      _state: S, _update: update, _draw: draw, _press: press, _obsX: obsX,
+      _state: S, _update: update, _draw: draw, _press: press, _obsX: obsX, _phys: { G, JUMP_V, speed },
     };
   },
 };

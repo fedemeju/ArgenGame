@@ -17,17 +17,18 @@ const inst = game.mount(document.getElementById('g'), { seed: Number(q.get('seed
 const steps = Number(q.get('pasos') || 0), acc = q.get('accion');
 if (steps) {
   if (inst._press) inst._press('jump', false); else inst._move(0);
-  const S = inst._state, tUp = h => (7.4 - Math.sqrt(Math.max(0, 54.76 - 52 * h))) / 26;
+  const S = inst._state, ph = inst._phys || {};
+  const tUp = h => (ph.JUMP_V - Math.sqrt(Math.max(0, ph.JUMP_V ** 2 - 2 * ph.G * h))) / ph.G;
   for (let i = 0; i < steps; i++) {
     if (acc && i === steps - 6) inst._press(acc === 'saltar' ? 'jump' : 'duck', true);
     // &piloto=1: en el carpincho salta y se agacha solo, como en tests/carpincho.sim.mjs
     if (q.get('piloto') && inst._obsX) {
-      const v = 5.5 + Math.min(4.5, 0.0075 * S.d);
+      const v = ph.speed(S.d);
       const n = S.obs.map(o => [o, inst._obsX(o)]).filter(([o, x]) => x + o.w > S.d - 0.5).sort((a, b) => a[1] - b[1])[0];
       if (n) {
         const [o, x] = n, tc = (x - (S.d + 0.55)) / (v + o.vx);
         if (o.low) { if (S.duckHeld) inst._press('duck', false); if (S.y === 0 && tc <= tUp(o.y1) + 0.01) inst._press('jump', true); }
-        else if (S.y === 0) inst._press('duck', tc < 0.3);
+        else inst._press('duck', tc < (S.y > 0 ? 0.6 : 0.3));
       }
     }
     inst._update(16);
