@@ -12,7 +12,7 @@ const G = 22, JUMP_V = 7, AIR = 2 * JUMP_V / G;
 const V0 = 4.8, VMAX = 9.5, K = 0.006, DCAP = (VMAX - V0) / K;
 const JUMP_BUFFER = 0.15;                // si tocás saltar un poco antes de caer, salta al tocar el piso
 const NIGHT_AT = 250, NIGHT_LEN = 200;   // a los 250 m empieza a oscurecer; a los 450 m es de noche
-const SKY_DAY = ['#2c4b82', '#9f86a8', '#f2a982', '#ffdca4'], SKY_NIGHT = ['#070b22', '#141a45', '#2a2d5e', '#463f72'];
+const SKY_DAY = ['#2c4b82', '#9f86a8', '#f2a982', '#ffdca4'], SKY_NIGHT = ['#020309', '#060a1e', '#0e1330', '#1a1d3e'];
 const mix = (a, b, t) => {
   const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), x = p(a), y = p(b);
   return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`;
@@ -47,8 +47,9 @@ const TITLES = {
 };
 
 // Imágenes del carpincho y el tero (assets/carpincho/); si no cargaron, se dibujan en código.
-// corre.webp es una tira de 15 cuadros sacados de un video (3 pasos de trote): el ciclo entero dura RUN_CYCLE metros.
-const RUN_FRAMES = 15, RUN_CYCLE = 3;
+// corre.webp: los 30 cuadros de un GIF (3 pasos de trote, 10 cuadros por paso, 1 paso por segundo en el original).
+// Se pasan por tiempo y no por distancia: arranca a 1,6 pasos por segundo y acelera poco, para que no parezca a las corridas.
+const RUN_FRAMES = 30, RUN_FPS = 16;
 const TERO_FRAMES = 9;                   // tero.webp: un aleteo completo en 9 cuadros, también sacado de un GIF
 const IMG = () => ({
   corre: getCustom('carpCorre'),
@@ -128,7 +129,7 @@ export default {
     const S = {
       d: 0, y: 0, vy: 0, duck: false, duckHeld: false, started: false, alive: true, score: 0,
       landT: 0, startT: 0, obs: [], nextX: 16, spawned: 0, crash: null, shake: 0, parts: [], dustT: 0,
-      jumpBuf: 0, rot: 0, duckT: 0,
+      jumpBuf: 0, rot: 0, duckT: 0, runF: 0,
     };
     let endTimer = 0;
     const report = () => onScore(S.score, `Metros · ${(speed(S.d) * 3.6).toFixed(0)} km/h`);
@@ -168,6 +169,7 @@ export default {
       S.startT += sec;
       const v = speed(S.d);
       S.d += v * sec;
+      if (S.y === 0 && !S.duckHeld) S.runF = (S.runF + sec * RUN_FPS * Math.pow(v / V0, 0.6)) % RUN_FRAMES;
       if (S.y > 0 || S.vy > 0) {
         S.vy -= G * (S.duckHeld ? 3 : 1) * sec;
         S.y += S.vy * sec;
@@ -278,7 +280,11 @@ export default {
     // De noche: oscurece todo y después prende luna, estrellas, faroles, ventanas y luciérnagas.
     function drawNight(now) {
       if (night <= 0) return;
-      ctx.fillStyle = `rgba(8,12,40,${0.5 * night})`; ctx.fillRect(-30, -30, W + 60, H + 60);
+      // noche cerrada, salvo el tramo del sendero por donde viene el carpincho (si no, no se ven los obstáculos)
+      const [lx, ly] = P(S.d + 2.2, 0.3, Z0), lr = Math.max(W, H) * 0.3;
+      const dark = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr);
+      dark.addColorStop(0, `rgba(3,5,18,${0.45 * night})`); dark.addColorStop(1, `rgba(3,5,18,${0.86 * night})`);
+      ctx.fillStyle = dark; ctx.fillRect(-30, -30, W + 60, H + 60);
       ctx.save();
       ctx.globalAlpha = night;
       for (let i = 0; i < 70; i++) {
@@ -676,7 +682,7 @@ export default {
       let frames = [], ww = 1.3, vs = 1;
       if (S.y > 0 && im.salto) frames = [[im.salto, 1, -1]];
       else if (S.duck && im.agachado) { frames = [[im.agachado, 1, -1]]; ww = 1.45; vs = 0.8; }
-      else if (im.corre) frames = [[im.corre, 1, running ? Math.floor((S.d / RUN_CYCLE % 1) * RUN_FRAMES) : 0]];
+      else if (im.corre) frames = [[im.corre, 1, Math.floor(S.runF) % RUN_FRAMES]];
       ctx.save();
       ctx.translate(sx, sy - 0.35 * s);
       if (S.crash) {
