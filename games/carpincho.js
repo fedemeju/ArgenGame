@@ -28,7 +28,7 @@ const KINDS = {
   conos: { low: 1, w: [1, 1], y1: 0.55, peso: 1 },
   lomo: { low: 1, w: [1.2, 1.4], y1: 0.2, peso: 2 },
   tacho: { low: 1, w: [0.5, 0.5], y1: 0.62, peso: 2 },
-  barrera: { high: 1, w: [0.22, 0.22], y0: 0.52, y1: 0.62, peso: 3 },
+  barrera: { high: 1, salta: 1, w: [0.22, 0.22], y0: 0.52, y1: 0.62, peso: 3 }, // la única de arriba que también se salta
   pelota: { high: 1, w: [0.18, 0.18], y0: 0.51, y1: 0.69, vx: 2.2, peso: 2 },
   tero: { high: 1, w: [0.5, 0.5], y0: 0.58, y1: 0.86, vx: 1.2, peso: 3 },
   dron: { high: 1, w: [0.55, 0.55], y0: 0.55, y1: 0.68, peso: 2 },
@@ -103,7 +103,8 @@ export default {
   rules: [
     'El carpincho se metió al barrio cerrado y corre solo, cada vez más rápido.',
     'Tocá la mitad derecha de la pantalla para saltar los setos, conos, tachos y lomos de burro.',
-    'Mantené apretada la mitad izquierda para agacharte: la barrera de la guardia, las pelotas de golf, los teros y los drones solo se pasan agachado.',
+    'Mantené apretada la mitad izquierda para agacharte: las pelotas de golf, los teros y los drones solo se pasan agachado.',
+    'La barrera de la guardia la podés saltar o pasar agachado.',
     'Si te agachás en el aire, bajás más rápido.',
     'Cada metro que corrés suma 1 punto.',
   ],
@@ -142,7 +143,7 @@ export default {
         let kind = rng() < highP ? pickW(HIGHS, rng()) : pickW(LOWS, rng());
         if (KINDS[kind].high && !S.teroVisto) { kind = 'tero'; S.teroVisto = true; }
         const k = KINDS[kind], w = k.w[0] + rng() * (k.w[1] - k.w[0]);
-        S.obs.push({ kind, id: n, X: S.nextX, w, y0: k.y0 || 0, y1: k.y1, vx: k.vx || 0, low: !!k.low, passed: false });
+        S.obs.push({ kind, id: n, X: S.nextX, w, y0: k.y0 || 0, y1: k.y1, vx: k.vx || 0, low: !!k.low, salta: !!(k.low || k.salta), passed: false });
         const extra = 0.4 + 1.2 * Math.max(0, 1 - n / 60);
         S.nextX += w + v * (AIR + 0.32) + NOSE + TAIL + v * rng() * extra;
       }
@@ -196,7 +197,8 @@ export default {
       for (const o of S.obs) {
         const ox = obsX(o), m = o.w * 0.12;
         // los que vuelan no se pueden saltar: chocan con todo lo que esté arriba de su parte de abajo
-        if (px1 > ox + m && px0 < ox + o.w - m && top > o.y0 + 0.02 && (!o.low || S.y < o.y1 * 0.9)) return die(o.kind);
+        // (la barrera sí: se pasa por arriba o por abajo)
+        if (px1 > ox + m && px0 < ox + o.w - m && top > o.y0 + 0.02 && (!o.salta || S.y < o.y1 * 0.9)) return die(o.kind);
         if (!o.passed && ox + o.w < px0) { o.passed = true; audio.tone(880, 0.04, 'triangle', 0.03); }
         if (o.kind === 'tero' && !o.chirp && ox - S.d < 6) { o.chirp = true; audio.tone(1900, 0.05, 'square', 0.03); audio.tone(2100, 0.05, 'square', 0.03, 0.09); }
       }
