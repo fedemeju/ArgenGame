@@ -1,0 +1,4 @@
+# imágenes originales que pasa el dueño (se procesan con tools/importar-*.html y van a assets/)
+assets/nuevas/
+# configuración local de Claude
+.claude/

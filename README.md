@@ -63,6 +63,7 @@ Después se agrega a la lista de `games/index.js`. Usar siempre el `seed` para e
 - [x] El Fitito en la Panamericana (`games/fitito.js`).
 - [x] El Fitito en pixel art, con la ruta recta y el paisaje argento (`games/fitito-art.js`).
 - [x] Conectar Firebase.
+- [x] El Carpincho de Nordelta (`games/carpincho.js`): corredor en 2.5D, saltar y agacharse.
 - [ ] **Más juegos**: con las ideas del usuario. `games/torre.js` (Torre de Alfajores) está escrito pero fuera del sorteo.
 - [ ] Conectar Firebase (pasos arriba).
 

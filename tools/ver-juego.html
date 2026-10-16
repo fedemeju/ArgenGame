@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<!-- Dibuja un cuadro de un juego para sacarle captura sin depender del panel del navegador.
+     ?juego=carpincho&pasos=300&seed=3   (pasos de 16 ms antes de congelar)
+     &accion=saltar|agachar  (se aprieta 6 pasos antes del final)   &propias=no  (sin imágenes de assets/) -->
+<style>body{margin:0;background:#222}#g{position:relative;width:100vw;height:100vh;overflow:hidden}</style>
+<div id="g"></div>
+<script type="module">
+import { GAMES } from './games/index.js';
+import { loadCustomArt } from './js/art.js';
+const q = new URLSearchParams(location.search);
+if (q.get('propias') !== 'no') { loadCustomArt(); await new Promise(r => setTimeout(r, 600)); }
+const game = GAMES[q.get('juego') || 'carpincho'];
+const inst = game.mount(document.getElementById('g'), { seed: Number(q.get('seed') || 3), onScore() {}, onEnd() {} });
+const steps = Number(q.get('pasos') || 0), acc = q.get('accion');
+if (steps) {
+  if (inst._press) inst._press('jump', false); else inst._move(0);
+  const S = inst._state, tUp = h => (7.4 - Math.sqrt(Math.max(0, 54.76 - 52 * h))) / 26;
+  for (let i = 0; i < steps; i++) {
+    if (acc && i === steps - 6) inst._press(acc === 'saltar' ? 'jump' : 'duck', true);
+    // &piloto=1: en el carpincho salta y se agacha solo, como en tests/carpincho.sim.mjs
+    if (q.get('piloto') && inst._obsX) {
+      const v = 5.5 + Math.min(4.5, 0.0075 * S.d);
+      const n = S.obs.map(o => [o, inst._obsX(o)]).filter(([o, x]) => x + o.w > S.d - 0.5).sort((a, b) => a[1] - b[1])[0];
+      if (n) {
+        const [o, x] = n, tc = (x - (S.d + 0.55)) / (v + o.vx);
+        if (o.low) { if (S.duckHeld) inst._press('duck', false); if (S.y === 0 && tc <= tUp(o.y1) + 0.01) inst._press('jump', true); }
+        else if (S.y === 0) inst._press('duck', tc < 0.3);
+      }
+    }
+    inst._update(16);
+  }
+  inst._state.started = false;
+}
+</script>
