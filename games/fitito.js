@@ -204,7 +204,7 @@ export default {
       for (const tl of tolls) {
         if (!tl.warned && tl.z - pz < 0.45 * KM) {
           tl.warned = true;
-          flash(toast, `Peaje: carril ${['izquierdo', 'del medio', 'derecho'][tl.lane]} cerrado`);
+          flash(toast, `Peaje: el carril ${['izquierdo', 'del medio', 'derecho'][tl.lane]} es MANUAL, ¡barrera baja!`);
           audio.tone(660, 0.12, 'square', 0.08); audio.tone(660, 0.12, 'square', 0.08, 0.2);
         }
         if (tl.z - prevPz > -SEG * 0.5 && tl.z - pz < SEG * 0.5 && Math.abs(laneX(tl.lane) - S.x) < (2 / 3 * 0.92 + CAR_W) / 2 * 0.8) return die('peaje');
@@ -495,11 +495,12 @@ export default {
           box(-1.45 * ROAD, 1.45 * ROAD, 4.9 * M, 6.0 * M, z, z + 1.6 * M, conc);
           [0, 1, 2].forEach(l => {
             const xc = laneX(l) * ROAD, hw = ROAD / 3 * 0.8, closed = l === cl;
+            // el carril con la barrera baja es el MANUAL (cartel naranja), como en los peajes de verdad
             const sign = box(xc - hw, xc + hw, 5.05 * M, 5.85 * M, z - 0.06 * M, z, closed
-              ? { front: '#b3261e', side: '#8a1c16', top: '#c73a31' } : { front: '#1f8a4c', side: '#166638', top: '#2a9d5b' });
+              ? { front: '#e8741c', side: '#b95a12', top: '#f08c3a' } : { front: '#1f8a4c', side: '#166638', top: '#2a9d5b' });
             if (sign) {
               ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = Math.max(1, 0.05 * M * k); ctx.strokeRect(sign.x + 0.08 * M * k, sign.y + 0.08 * M * k, sign.w - 0.16 * M * k, sign.h - 0.16 * M * k);
-              text(closed ? 'CERRADO' : 'TELEPEAJE', sign.x + sign.w / 2, sign.y + sign.h / 2, 0.36 * M * k, '#fff', 900);
+              text(closed ? 'MANUAL' : 'TELEPEAJE', sign.x + sign.w / 2, sign.y + sign.h / 2, 0.36 * M * k, '#fff', 900);
             }
             const lp = P(xc, 4.7 * M, z - 0.05 * M), d = 0.18 * M * k;
             if (closed) {
