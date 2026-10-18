@@ -74,6 +74,135 @@ function solDeMayo(c, x, y, r, t) {
   c.beginPath(); c.arc(x, y + r * 0.1, r * 0.35, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
 }
 
+/* ---------- Buenos Aires de fondo (todo en u; base = línea de la vereda en píxeles) ---------- */
+
+// Siluetas lejanas: el Barolo, el Kavanagh, la Torre Monumental y el Congreso.
+function landmark(c, kind, x, base, k) {
+  const R = (x0, w, h, y0 = 0) => c.fillRect(x + x0 * k, base - (y0 + h) * k, w * k, h * k);
+  const dome = (cx, y0, r) => { c.beginPath(); c.arc(x + cx * k, base - y0 * k, r * k, Math.PI, 0); c.fill(); };
+  const spire = (cx, y0, h, w = 0.004) => { c.beginPath(); c.moveTo(x + (cx - w) * k, base - y0 * k); c.lineTo(x + cx * k, base - (y0 + h) * k); c.lineTo(x + (cx + w) * k, base - y0 * k); c.fill(); };
+  if (kind === 'barolo') {
+    R(0, 0.1, 0.24); R(0.025, 0.05, 0.07, 0.24); R(0.035, 0.03, 0.03, 0.31);
+    dome(0.05, 0.34, 0.018); R(0.046, 0.008, 0.02, 0.35); spire(0.05, 0.37, 0.02);
+  } else if (kind === 'kavanagh') {
+    R(0, 0.12, 0.2); R(0.015, 0.09, 0.07, 0.2); R(0.03, 0.06, 0.06, 0.27); R(0.042, 0.036, 0.05, 0.33); spire(0.06, 0.38, 0.04, 0.002);
+  } else if (kind === 'torre') {
+    R(0.02, 0.04, 0.26); R(0.014, 0.052, 0.045, 0.26); spire(0.04, 0.305, 0.04, 0.028); spire(0.04, 0.34, 0.03, 0.003);
+    const fill = c.fillStyle; c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath(); c.arc(x + 0.04 * k, base - 0.282 * k, 0.012 * k, 0, Math.PI * 2); c.fill(); c.fillStyle = fill;
+  } else if (kind === 'congreso') {
+    R(0, 0.2, 0.1); R(0.06, 0.08, 0.05, 0.1); dome(0.1, 0.15, 0.04); R(0.093, 0.014, 0.02, 0.188); spire(0.1, 0.208, 0.025);
+  }
+}
+
+const FACHADA = ['#e6d3b3', '#d9c7a7', '#cdbb9d', '#e2c9a2', '#c9bfb0', '#d8b9a2'];
+const TOLDOS = [['#c0392b', '#f4f1ea'], ['#2e7d4f', '#f4f1ea'], ['#2d5f9a', '#f4f1ea'], ['#d68a1c', '#f4f1ea']];
+
+// Edificio porteño: planta baja con negocio y toldo, balcones franceses y techo mansarda.
+function edificio(c, x, base, k, r1, r2, r3) {
+  const w = 0.16 * k, floors = 4 + Math.floor(r1 * 4), fh = 0.036 * k, pb = 0.045 * k;
+  const top = base - pb - floors * fh;
+  c.fillStyle = FACHADA[Math.floor(r2 * FACHADA.length)];
+  c.fillRect(x, top, w, base - top);
+  // planta baja: vidriera y toldo a rayas
+  c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(x, base - pb, w, pb);
+  c.fillStyle = '#34414f'; c.fillRect(x + w * 0.1, base - pb * 0.75, w * 0.5, pb * 0.75);
+  c.fillStyle = '#5a3b26'; c.fillRect(x + w * 0.7, base - pb * 0.85, w * 0.18, pb * 0.85);
+  const [ta, tb] = TOLDOS[Math.floor(r3 * TOLDOS.length)];
+  for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? tb : ta; c.beginPath(); c.moveTo(x + w * (0.06 + i * 0.09), base - pb * 0.95); c.lineTo(x + w * (0.15 + i * 0.09), base - pb * 0.95); c.lineTo(x + w * (0.17 + i * 0.09), base - pb * 0.6); c.lineTo(x + w * (0.08 + i * 0.09), base - pb * 0.6); c.fill(); }
+  // pisos con ventanas altas y balcones de hierro
+  for (let f = 0; f < floors; f++) {
+    const fy = base - pb - (f + 1) * fh;
+    for (let i = 0; i < 3; i++) {
+      const wx = x + w * (0.12 + i * 0.29), ww = w * 0.17, wh = fh * 0.66;
+      c.fillStyle = '#46556a'; c.fillRect(wx, fy + fh * 0.18, ww, wh);
+      c.fillStyle = 'rgba(255,255,255,.22)'; c.fillRect(wx, fy + fh * 0.18, ww * 0.35, wh);
+      c.fillStyle = '#efe6d2'; c.fillRect(wx - 1, fy + fh * 0.12, ww + 2, 1.5);
+      c.strokeStyle = '#222'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(wx - ww * 0.15, fy + fh * 0.84); c.lineTo(wx + ww * 1.15, fy + fh * 0.84);
+      for (let b = 0; b <= 4; b++) { const bx = wx - ww * 0.15 + b * ww * 0.325; c.moveTo(bx, fy + fh * 0.84); c.lineTo(bx, fy + fh * 0.62); }
+      c.moveTo(wx - ww * 0.15, fy + fh * 0.62); c.lineTo(wx + ww * 1.15, fy + fh * 0.62); c.stroke();
+    }
+    c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(x, fy + fh - 1.5, w, 1.5);
+  }
+  // cornisa y mansarda de pizarra con buhardillas
+  c.fillStyle = '#efe6d2'; c.fillRect(x - 2, top - 3, w + 4, 4);
+  c.fillStyle = '#5d6470';
+  c.beginPath(); c.moveTo(x + w * 0.04, top - 3); c.lineTo(x + w * 0.14, top - 0.03 * k); c.lineTo(x + w * 0.86, top - 0.03 * k); c.lineTo(x + w * 0.96, top - 3); c.fill();
+  for (const dx of [0.3, 0.62]) {
+    c.fillStyle = '#efe6d2'; c.fillRect(x + w * dx, top - 0.024 * k, w * 0.09, 0.016 * k);
+    c.fillStyle = '#46556a'; c.fillRect(x + w * (dx + 0.02), top - 0.02 * k, w * 0.05, 0.011 * k);
+  }
+}
+
+function casaRosada(c, x, base, k) {
+  const w = 0.2 * k, h = 0.13 * k, top = base - h;
+  c.fillStyle = '#e7a49b'; c.fillRect(x, top, w, h);
+  c.fillStyle = '#d68f86'; c.fillRect(x, top, w, 3); c.fillRect(x, base - h * 0.36, w, 2);
+  c.fillStyle = '#7d4a45';
+  for (let row = 0; row < 2; row++) for (let i = 0; i < 6; i++) {
+    const wx = x + w * (0.06 + i * 0.155), wy = top + h * (0.14 + row * 0.38), ww = w * 0.07, wh = h * 0.22;
+    if (row === 1 && (i === 2 || i === 3)) continue;
+    c.fillRect(wx, wy + ww / 2, ww, wh - ww / 2); c.beginPath(); c.arc(wx + ww / 2, wy + ww / 2, ww / 2, Math.PI, 0); c.fill();
+  }
+  c.beginPath(); c.moveTo(x + w * 0.4, base); c.lineTo(x + w * 0.4, base - h * 0.32); c.arc(x + w * 0.5, base - h * 0.32, w * 0.1, Math.PI, 0); c.lineTo(x + w * 0.6, base); c.fill();
+  // mástil con la bandera
+  c.fillStyle = '#555'; c.fillRect(x + w * 0.5 - 1, top - 0.07 * k, 2, 0.07 * k);
+  const fx = x + w * 0.5 + 1, fy = top - 0.07 * k, fw = 0.04 * k, fh = 0.027 * k;
+  c.fillStyle = '#74acdf'; c.fillRect(fx, fy, fw, fh);
+  c.fillStyle = '#ffffff'; c.fillRect(fx, fy + fh / 3, fw, fh / 3);
+  c.fillStyle = '#f6b40e'; c.beginPath(); c.arc(fx + fw / 2, fy + fh / 2, fh * 0.12, 0, Math.PI * 2); c.fill();
+}
+
+function jacaranda(c, x, base, k, r) {
+  c.strokeStyle = '#4a3427'; c.lineCap = 'round';
+  c.lineWidth = 0.012 * k; c.beginPath(); c.moveTo(x, base); c.lineTo(x + 0.005 * k, base - 0.09 * k); c.stroke();
+  c.lineWidth = 0.006 * k; c.beginPath();
+  c.moveTo(x + 0.004 * k, base - 0.08 * k); c.lineTo(x - 0.035 * k, base - 0.13 * k);
+  c.moveTo(x + 0.004 * k, base - 0.085 * k); c.lineTo(x + 0.045 * k, base - 0.135 * k); c.stroke();
+  const cols = ['#7d5bc0', '#9b7ad8', '#b394e8'];
+  const blobs = [[-0.04, 0.14, 0.04], [0.04, 0.145, 0.042], [0, 0.17, 0.045], [-0.015, 0.12, 0.035], [0.025, 0.12, 0.033]];
+  cols.forEach((col, ci) => {
+    c.fillStyle = col;
+    blobs.forEach(([bx, by, br], i) => { if ((i + ci) % 3 === 2 && ci) return; c.beginPath(); c.arc(x + (bx + (r - 0.5) * 0.01 - ci * 0.004) * k, base - (by + ci * 0.006) * k, br * (1 - ci * 0.22) * k, 0, Math.PI * 2); c.fill(); });
+  });
+  // flores caídas en la vereda
+  c.fillStyle = 'rgba(155,122,216,.55)'; c.fillRect(x - 0.05 * k, base - 2, 0.1 * k, 2);
+}
+
+function farol(c, x, base, k) {
+  c.fillStyle = '#1f2326';
+  c.fillRect(x - 0.003 * k, base - 0.15 * k, 0.006 * k, 0.15 * k);
+  c.fillRect(x - 0.008 * k, base - 0.012 * k, 0.016 * k, 0.012 * k);
+  c.beginPath(); c.moveTo(x - 0.012 * k, base - 0.15 * k); c.lineTo(x + 0.012 * k, base - 0.15 * k); c.lineTo(x + 0.008 * k, base - 0.18 * k); c.lineTo(x - 0.008 * k, base - 0.18 * k); c.fill();
+  c.fillStyle = '#fff3c4'; c.fillRect(x - 0.007 * k, base - 0.175 * k, 0.014 * k, 0.02 * k);
+  c.fillStyle = '#1f2326'; c.beginPath(); c.moveTo(x - 0.014 * k, base - 0.18 * k); c.lineTo(x, base - 0.192 * k); c.lineTo(x + 0.014 * k, base - 0.18 * k); c.fill();
+}
+
+// Taxi negro y amarillo o colectivo, de costado, mirando a la derecha. y: donde apoyan las ruedas.
+function vehiculo(c, v, x, y, k) {
+  const L = v.kind === 'bondi' ? 0.19 : 0.1, Hh = v.kind === 'bondi' ? 0.06 : 0.032;
+  const w = L * k, h = Hh * k;
+  c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(x + w * 0.05, y - 2, w * 0.9, 3);
+  if (v.kind === 'bondi') {
+    c.fillStyle = v.color; c.fillRect(x, y - h, w, h * 0.85);
+    c.fillStyle = v.color2; c.fillRect(x, y - h * 0.42, w, h * 0.12);
+    c.fillStyle = '#2b3846'; for (let i = 0; i < 6; i++) c.fillRect(x + w * (0.06 + i * 0.13), y - h * 0.9, w * 0.1, h * 0.32);
+    c.fillRect(x + w * 0.88, y - h * 0.9, w * 0.11, h * 0.55);
+    c.fillStyle = '#f6b40e'; c.fillRect(x + w * 0.9, y - h * 0.98, w * 0.08, h * 0.08);
+    c.fillStyle = '#fff'; c.font = `900 ${h * 0.22}px Chivo, system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(v.linea, x + w * 0.3, y - h * 0.3);
+  } else {
+    c.fillStyle = '#16181b';
+    c.beginPath(); c.moveTo(x, y - h * 0.15); c.lineTo(x, y - h * 0.55); c.lineTo(x + w * 0.22, y - h * 0.6); c.lineTo(x + w * 0.32, y - h); c.lineTo(x + w * 0.72, y - h); c.lineTo(x + w * 0.84, y - h * 0.6); c.lineTo(x + w, y - h * 0.52); c.lineTo(x + w, y - h * 0.15); c.fill();
+    c.fillStyle = '#f2c230'; c.beginPath(); c.moveTo(x + w * 0.3, y - h * 0.62); c.lineTo(x + w * 0.35, y - h * 0.95); c.lineTo(x + w * 0.7, y - h * 0.95); c.lineTo(x + w * 0.8, y - h * 0.62); c.fill();
+    c.fillStyle = '#2b3846'; c.fillRect(x + w * 0.36, y - h * 0.9, w * 0.15, h * 0.24); c.fillRect(x + w * 0.54, y - h * 0.9, w * 0.15, h * 0.24);
+    c.fillStyle = '#ffe9a3'; c.fillRect(x + w * 0.96, y - h * 0.48, w * 0.04, h * 0.12);
+    c.fillStyle = '#16181b'; c.fillRect(x + w * 0.46, y - h * 1.12, w * 0.1, h * 0.14);
+  }
+  c.fillStyle = '#111'; for (const fx of [0.2, 0.8]) { c.beginPath(); c.arc(x + w * fx, y - h * 0.1, h * (v.kind === 'bondi' ? 0.17 : 0.22), 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = '#888'; for (const fx of [0.2, 0.8]) { c.beginPath(); c.arc(x + w * fx, y - h * 0.1, h * (v.kind === 'bondi' ? 0.07 : 0.09), 0, Math.PI * 2); c.fill(); }
+}
+
 function medialuna(c, x, y, s) {
   c.save(); c.translate(x, y); c.rotate(-0.4);
   c.fillStyle = '#d98a2b'; c.strokeStyle = '#8a4e12'; c.lineWidth = s * 0.08;
@@ -100,42 +229,66 @@ function teroCode(c, x, y, s, t) {
   c.restore();
 }
 
-// Dibuja un Obelisco con el contorno exacto de los choques. k: píxeles por u.
+// Dibuja un Obelisco con el contorno exacto de los choques, visto de esquina: la cara izquierda
+// al sol, la derecha en sombra y la arista en el medio, como se lo ve desde la 9 de Julio. k: píxeles por u.
 function drawObelisk(c, pts, k, offX, dir, festejo) {
   const P = pts.map(([x, y]) => [(x - offX) * k, y * k]);
   const path = list => { c.beginPath(); list.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); };
-  const xl = P[5][0], xr = P[4][0];
-  // fuste de piedra con luz desde la izquierda
-  const g = c.createLinearGradient(xl, 0, xr, 0);
-  g.addColorStop(0, '#f1ece0'); g.addColorStop(0.55, '#ddd5c4'); g.addColorStop(1, '#b8af9c');
-  path(P); c.fillStyle = g; c.fill();
-  // cara en sombra (mitad derecha), así se ve que tiene volumen
-  c.fillStyle = 'rgba(90,80,60,.16)';
-  c.beginPath(); c.moveTo(P[0][0], P[0][1]); c.lineTo(P[1][0], P[1][1]); c.lineTo(P[2][0], P[2][1]); c.lineTo((P[2][0] + P[7][0]) / 2 + (P[2][0] - P[7][0]) * 0.08, P[2][1]); c.closePath(); c.fill();
-  // piramidión un poco más oscuro
-  c.fillStyle = 'rgba(120,110,90,.22)';
-  c.beginPath(); c.moveTo(P[0][0], P[0][1]); c.lineTo(P[1][0], P[1][1]); c.lineTo(P[8][0], P[8][1]); c.closePath(); c.fill();
-  // ventanita cerca de la punta
-  const wx = P[0][0], wy = P[0][1] - dir * (TIP + 0.03) * k;
-  c.fillStyle = '#4a4436'; c.fillRect(wx - 0.006 * k, wy - 0.008 * k, 0.012 * k, 0.016 * k);
-  // juntas de los bloques de piedra
-  c.strokeStyle = 'rgba(110,100,80,.18)'; c.lineWidth = 1;
-  const y0 = P[1][1], y1 = P[2][1];
-  for (let yy = y0 - dir * 0.08 * k; dir < 0 ? yy < y1 : yy > y1; yy -= dir * 0.08 * k) {
-    const t = (yy - y0) / (y1 - y0), half = (P[1][0] - P[0][0]) + t * ((P[2][0] - P[0][0]) - (P[1][0] - P[0][0]));
-    c.beginPath(); c.moveTo(P[0][0] - half, yy); c.lineTo(P[0][0] + half, yy); c.stroke();
+  const xc = P[0][0], tipY = P[0][1], shY = P[1][1], botY = P[2][1];
+  const along = (yy, side) => { // borde del fuste a la altura yy (side -1 izquierda, 1 derecha)
+    const t = (yy - shY) / (botY - shY);
+    return xc + side * ((P[1][0] - xc) + t * ((P[2][0] - xc) - (P[1][0] - xc)));
+  };
+  // fuste: cara al sol y cara en sombra, un poco más sucias cerca del pie
+  const lit = c.createLinearGradient(0, shY, 0, botY), dark = c.createLinearGradient(0, shY, 0, botY);
+  lit.addColorStop(0, '#f6f1e6'); lit.addColorStop(1, '#e2d9c6');
+  dark.addColorStop(0, '#d3c9b4'); dark.addColorStop(1, '#bcb19a');
+  path([[xc, shY], P[8], P[7], [xc, botY]]); c.fillStyle = lit; c.fill();
+  path([[xc, shY], P[1], P[2], [xc, botY]]); c.fillStyle = dark; c.fill();
+  // piramidión
+  path([P[0], P[8], [xc, shY]]); c.fillStyle = '#ece4d0'; c.fill();
+  path([P[0], P[1], [xc, shY]]); c.fillStyle = '#b6ab92'; c.fill();
+  // juntas de los bloques de piedra, apenas marcadas
+  c.lineWidth = 1;
+  for (let yy = shY - dir * 0.06 * k; dir < 0 ? yy < botY - 0.01 * k : yy > botY + 0.01 * k; yy -= dir * 0.06 * k) {
+    c.strokeStyle = 'rgba(120,108,85,.14)'; c.beginPath(); c.moveTo(along(yy, -1), yy); c.lineTo(xc, yy); c.stroke();
+    c.strokeStyle = 'rgba(80,70,52,.16)'; c.beginPath(); c.moveTo(xc, yy); c.lineTo(along(yy, 1), yy); c.stroke();
   }
-  // festejo: iluminado de celeste y blanco
+  // ventanitas debajo de la punta, una por cara (la de la sombra se ve más angosta)
+  const wy = shY - dir * 0.022 * k, wh = 0.014 * k;
+  c.fillStyle = '#3f3a30';
+  c.fillRect(xc - (xc - along(wy, -1)) * 0.55 - 0.004 * k, wy - wh / 2, 0.008 * k, wh);
+  c.fillStyle = '#2f2b24';
+  c.fillRect(xc + (along(wy, 1) - xc) * 0.5 - 0.0025 * k, wy - wh / 2, 0.005 * k, wh);
+  // arista del medio y contorno
+  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(xc, tipY); c.lineTo(xc, botY); c.stroke();
+  c.strokeStyle = 'rgba(130,118,95,.45)';
+  c.beginPath(); c.moveTo(P[8][0], P[8][1]); c.lineTo(P[1][0], P[1][1]); c.stroke();
+  // pararrayos en la punta
+  c.strokeStyle = '#4b4b4b'; c.lineWidth = Math.max(1, 0.003 * k);
+  c.beginPath(); c.moveTo(xc, tipY); c.lineTo(xc, tipY + dir * 0.018 * k); c.stroke();
+  // festejo: proyectado de celeste y blanco
   if (festejo) {
     c.save(); path(P); c.clip();
-    const bw = (xr - xl) / 3;
-    c.fillStyle = 'rgba(116,172,223,.55)'; c.fillRect(xl, -1e4, bw, 2e4); c.fillRect(xl + 2 * bw, -1e4, bw, 2e4);
-    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(xl + bw, -1e4, bw, 2e4);
+    const fg = c.createLinearGradient(0, tipY, 0, botY);
+    fg.addColorStop(0, 'rgba(116,172,223,.6)'); fg.addColorStop(0.33, 'rgba(116,172,223,.6)');
+    fg.addColorStop(0.34, 'rgba(255,255,255,.45)'); fg.addColorStop(0.66, 'rgba(255,255,255,.45)');
+    fg.addColorStop(0.67, 'rgba(116,172,223,.6)'); fg.addColorStop(1, 'rgba(116,172,223,.6)');
+    c.fillStyle = fg; c.fillRect(P[5][0], Math.min(tipY, botY), P[4][0] - P[5][0], Math.abs(botY - tipY));
     c.restore();
   }
-  // pedestal
-  c.fillStyle = '#8f8a80'; c.fillRect(P[6][0], Math.min(P[6][1], P[5][1]), P[3][0] - P[6][0], Math.abs(P[5][1] - P[6][1]));
-  path(P); c.strokeStyle = 'rgba(80,70,55,.45)'; c.lineWidth = 1.5; c.stroke();
+  path(P); c.strokeStyle = 'rgba(90,80,60,.4)'; c.lineWidth = 1.2; c.stroke();
+  // pedestal y, si sale de la vereda, el cantero de pasto alrededor
+  const py0 = Math.min(P[6][1], P[5][1]), ph = Math.abs(P[5][1] - P[6][1]);
+  c.fillStyle = '#a19b8f'; c.fillRect(P[6][0], py0, P[3][0] - P[6][0], ph);
+  c.fillStyle = '#c2bcae'; c.fillRect(P[6][0], dir < 0 ? py0 : py0 + ph - 2, P[3][0] - P[6][0], 2);
+  if (dir < 0) {
+    const gy = P[5][1], w = P[4][0] - P[5][0];
+    c.fillStyle = '#5e9c45'; c.fillRect(P[5][0] - w * 0.3, gy - 0.008 * k, w * 1.6, 0.008 * k);
+    c.fillStyle = '#7bb85a';
+    for (let i = 0; i < 7; i++) { const bx = P[5][0] - w * 0.28 + i * w * 0.26; c.beginPath(); c.ellipse(bx, gy - 0.008 * k, w * 0.12, 0.007 * k, 0, Math.PI, 0); c.fill(); }
+  }
 }
 
 export default {
@@ -174,7 +327,37 @@ export default {
       x: 0, y: 0.42, vy: 0, rot: 0, started: false, alive: true, score: 0,
       pipes: [], nextX: 1.05, prevGap: 0.42, spawned: 0, passedN: 0,
       acc: 0, flapT: 0, crash: null, shake: 0, floats: [], feathers: [],
+      cars: [], carT: 0,
     };
+    // tránsito de la 9 de Julio: es decorado, no usa el azar de la partida
+    const BONDIS = [['#d62828', '#f6b40e'], ['#1d4e89', '#f2f2f2'], ['#2a9d8f', '#e9c46a'], ['#f4a261', '#264653'], ['#7b2cbf', '#f2f2f2']];
+    const LINEAS = ['60', '152', '29', '39', '64', '10', '132', '17'];
+    function traffic(dt) {
+      S.carT -= dt;
+      if (S.carT <= 0) {
+        S.carT = 900 + Math.random() * 1800;
+        const bondi = Math.random() < 0.35, v = 0.12 + Math.random() * 0.45, col = BONDIS[Math.floor(Math.random() * BONDIS.length)];
+        const camL = S.x - TERO_X, view = st.w / st.h;
+        const lane = Math.random() < 0.5 ? 0.098 : 0.138;
+        const x = v > speedOf(S.passedN) && S.started ? camL - 0.3 : camL + view + 0.05;
+        if (!S.cars.some(o => o.lane === lane && Math.abs(o.x - x) < 0.3)) {
+          S.cars.push({
+            kind: bondi ? 'bondi' : 'taxi', lane, v, x,
+            color: col[0], color2: col[1], linea: LINEAS[Math.floor(Math.random() * LINEAS.length)],
+          });
+          S.cars.sort((a, b) => a.lane - b.lane);
+        }
+      }
+      // nadie se lleva puesto al de adelante: si lo alcanza, va a su velocidad
+      const len = v => (v.kind === 'bondi' ? 0.19 : 0.1);
+      for (const v of S.cars) {
+        const ahead = S.cars.filter(o => o !== v && o.lane === v.lane && o.x > v.x).sort((a, b) => a.x - b.x)[0];
+        if (ahead && ahead.x - v.x < len(v) + 0.04) v.v = Math.min(v.v, ahead.v);
+      }
+      for (const v of S.cars) v.x += v.v * dt / 1000;
+      const camL = S.x - TERO_X;
+      S.cars = S.cars.filter(v => v.x > camL - 0.6 && v.x < camL + st.w / st.h + 0.6);
+    }
     let endTimer = 0;
     const report = () => onScore(S.score, 'Puntos');
 
@@ -247,6 +430,7 @@ export default {
       S.acc += Math.min(0.05, dt / 1000);
       while (S.acc >= STEP) { physics(STEP); S.acc -= STEP; }
       S.flapT += dt;
+      traffic(dt);
       const target = !S.started ? 0 : !S.alive ? 1.4 : Math.max(-0.45, Math.min(1.2, S.vy * 0.9));
       S.rot += (target - S.rot) * Math.min(1, dt / (S.alive ? 90 : 160));
       S.floats = S.floats.filter(f => { f.y -= dt * 0.00012; f.life -= dt / 900; return f.life > 0; });
@@ -277,29 +461,44 @@ export default {
         circle(ctx, cx, cy, s); circle(ctx, cx + s, cy + s * 0.2, s * 0.8); circle(ctx, cx - s, cy + s * 0.25, s * 0.7); circle(ctx, cx + s * 0.3, cy - s * 0.4, s * 0.7);
       }
 
-      // edificios lejanos
-      const farP = 0.15;
-      ctx.fillStyle = '#9fc1de';
-      for (let i = -1; i < W / (0.12 * k) + 2; i++) {
-        const cell = Math.floor(camL * farP / 0.12) + i, r = hash(cell, 1);
-        const x = (cell * 0.12 - camL * farP) * k, h = (0.08 + r * 0.16) * k;
-        ctx.fillRect(x, GROUND * k - h, 0.11 * k, h);
-      }
-
-      // casas del barrio con tanques de agua y antenas
-      const midP = 0.4;
-      for (let i = -1; i < W / (0.16 * k) + 2; i++) {
-        const cell = Math.floor(camL * midP / 0.16) + i, r = hash(cell, 2);
-        const x = (cell * 0.16 - camL * midP) * k, w = 0.15 * k, h = (0.1 + r * 0.12) * k, top = GROUND * k - h;
-        ctx.fillStyle = ['#c9b79c', '#b7a3b8', '#a9bfae', '#c7a894'][Math.floor(hash(cell, 3) * 4)];
-        ctx.fillRect(x, top, w, h);
-        ctx.fillStyle = 'rgba(40,50,70,.35)';
-        for (let wy = top + 0.025 * k; wy < GROUND * k - 0.04 * k; wy += 0.045 * k) for (let wx = x + 0.02 * k; wx < x + w - 0.03 * k; wx += 0.045 * k) ctx.fillRect(wx, wy, 0.022 * k, 0.025 * k);
-        if (hash(cell, 4) < 0.6) {
-          ctx.fillStyle = '#2b2d31'; ctx.fillRect(x + w * 0.55, top - 0.04 * k, 0.04 * k, 0.04 * k);
+      const base = GROUND * k;
+      const layer = (par, size, fn) => {
+        for (let i = -2; i < W / (size * k) + 2; i++) {
+          const cell = Math.floor(camL * par / size) + i;
+          fn(cell, (cell * size - camL * par) * k);
         }
-        if (hash(cell, 5) < 0.4) { ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + w * 0.25, top); ctx.lineTo(x + w * 0.25, top - 0.05 * k); ctx.moveTo(x + w * 0.15, top - 0.04 * k); ctx.lineTo(x + w * 0.35, top - 0.04 * k); ctx.stroke(); }
-      }
+      };
+
+      // siluetas lejanas: torres comunes y, cada tanto, el Barolo, el Kavanagh, la Torre Monumental o el Congreso
+      const haze = (h, a) => {
+        const hg = ctx.createLinearGradient(0, base - h * k, 0, base);
+        hg.addColorStop(0, 'rgba(214,232,248,0)'); hg.addColorStop(1, `rgba(214,232,248,${a})`);
+        ctx.fillStyle = hg; ctx.fillRect(-20, base - h * k, W + 40, h * k);
+      };
+      ctx.fillStyle = '#8fb1d1';
+      layer(0.12, 0.17, (cell, x) => {
+        const r = hash(cell, 1);
+        if (r < 0.42 || cell % 5 === 0) landmark(ctx, ['barolo', 'kavanagh', 'torre', 'congreso'][Math.floor(hash(cell, 9) * 4)], x, base, k * 1.6);
+        else {
+          const h = (0.22 + hash(cell, 6) * 0.22) * k, w = (0.06 + hash(cell, 10) * 0.06) * k;
+          ctx.fillRect(x, base - h, w, h);
+          if (hash(cell, 12) < 0.4) ctx.fillRect(x + w * 0.45, base - h - 0.03 * k, 1.5, 0.03 * k);
+        }
+      });
+      haze(0.5, 0.35);
+
+      // edificios porteños, cada tanto la Casa Rosada
+      layer(0.35, 0.17, (cell, x) => {
+        if (hash(cell, 2) < 0.06) casaRosada(ctx, x - 0.02 * k, base, k);
+        else edificio(ctx, x, base, k, hash(cell, 3), hash(cell, 4), hash(cell, 5));
+      });
+      haze(0.35, 0.22);
+
+      // jacarandás y faroles sobre la vereda
+      layer(0.7, 0.22, (cell, x) => {
+        if (hash(cell, 13) < 0.65) jacaranda(ctx, x + 0.06 * k, base, k, hash(cell, 14));
+        farol(ctx, x + 0.17 * k, base, k);
+      });
 
       // Obeliscos
       for (const p of S.pipes) {
@@ -310,18 +509,19 @@ export default {
         if (p.medialuna && !p.medialuna.got) medialuna(ctx, x + w / 2, ((p.top + p.bot) / 2 + Math.sin(now / 250 + p.x) * 0.008) * k, 0.028 * k);
       }
 
-      // vereda, cordón y la 9 de Julio
+      // vereda de baldosas vainilla, cordón y la 9 de Julio con taxis y colectivos
       const gy = GROUND * k;
-      ctx.fillStyle = '#c9c4b8'; ctx.fillRect(-20, gy, W + 40, 0.05 * k);
-      ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 1;
-      const tile = 0.05 * k, off = ((camL * k) % tile + tile) % tile;
-      for (let x = -off; x < W + tile; x += tile) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, gy + 0.05 * k); ctx.stroke(); }
-      ctx.beginPath(); ctx.moveTo(0, gy + 0.025 * k); ctx.lineTo(W, gy + 0.025 * k); ctx.stroke();
-      ctx.fillStyle = '#e7dfc4'; ctx.fillRect(-20, gy + 0.05 * k, W + 40, 0.015 * k);
-      ctx.fillStyle = '#4a4f57'; ctx.fillRect(-20, gy + 0.065 * k, W + 40, H - gy);
-      ctx.fillStyle = '#f2f2f2';
-      const dash = 0.12 * k, doff = ((camL * k) % dash + dash) % dash;
-      for (let x = -doff; x < W + dash; x += dash) ctx.fillRect(x, gy + 0.1 * k, dash * 0.5, 0.008 * k);
+      ctx.fillStyle = '#d6cdb9'; ctx.fillRect(-20, gy, W + 40, 0.04 * k);
+      const tile = 0.02 * k, off = ((camL * k) % tile + tile) % tile;
+      ctx.fillStyle = 'rgba(120,105,80,.18)';
+      for (let x = -off; x < W + tile; x += tile) for (let yy = gy + tile * 0.25; yy < gy + 0.04 * k; yy += tile * 0.5) ctx.fillRect(x + tile * 0.25, yy, 1.5, 1.5);
+      ctx.fillStyle = 'rgba(0,0,0,.1)'; for (let x = -off; x < W + tile; x += tile) ctx.fillRect(x, gy, 1, 0.04 * k);
+      ctx.fillStyle = '#e9e1c8'; ctx.fillRect(-20, gy + 0.04 * k, W + 40, 0.012 * k);
+      ctx.fillStyle = '#4a4f57'; ctx.fillRect(-20, gy + 0.052 * k, W + 40, H - gy);
+      ctx.fillStyle = 'rgba(255,255,255,.8)';
+      const dash = 0.1 * k, doff = ((camL * k) % dash + dash) % dash;
+      for (let x = -doff; x < W + dash; x += dash) ctx.fillRect(x, gy + 0.098 * k, dash * 0.45, 0.005 * k);
+      for (const v of S.cars) vehiculo(ctx, v, X(v.x), (GROUND + v.lane) * k, k);
 
       drawTero(now);
 
