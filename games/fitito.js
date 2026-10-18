@@ -27,7 +27,26 @@ const CARS = [
   { name: '504', body: '#b8322a', side: '#86231d', top: '#cc463d', cab: 0.82, cz: [0.35, 0.75], luz: 'triste' },
   { name: 'torino', body: '#e0b12b', side: '#a8821a', top: '#f0c444', cab: 0.88, cz: [0.4, 0.78], luz: 'cuatro' },
 ];
-const PLACES = [['PILAR', '23 km'], ['ZÁRATE', '61 km'], ['ESCOBAR', '12 km'], ['CAMPANA', '48 km'], ['ROSARIO', '290 km'], ['TIGRE', '8 km']];
+// Panamericana, Ruta 9, ramal Escobar–Campana. Kilómetros de los mojones (la General Paz queda en el km 12).
+// Firmes: Ramal Tigre km 20, Ramal Pilar km 32, peaje km 34, Ruta 25 km 49, Campana km 75.
+// Los marcados "aprox" salen del orden real de los lugares (lista del dueño) ubicados entre esos: corregir acá.
+const START_KM = 30;                       // el viaje arranca en El Talar / Pacheco: el peaje llega a las 40 cuadras
+const KM = 80000;                          // un kilómetro en unidades del mundo (10 cuadras)
+const SALIDAS = [
+  { km: 28, ruta: 'RUTA 197', lugar: 'GRAL. PACHECO · EL TALAR', corto: 'PACHECO' },          // aprox
+  { km: 32, ruta: 'RUTA 8', lugar: 'RAMAL PILAR', corto: 'PILAR' },
+  { km: 36, ruta: 'RUTA 27', lugar: 'BENAVÍDEZ', corto: 'BENAVÍDEZ' },                           // aprox
+  { km: 41, ruta: 'RUTA 9 VIEJA', lugar: 'GARÍN', corto: 'GARÍN' },                          // aprox
+  { km: 44, ruta: 'RUTA 26', lugar: 'ING. MASCHWITZ', corto: 'MASCHWITZ' },                      // aprox
+  { km: 49, ruta: 'RUTA 25', lugar: 'BELÉN DE ESCOBAR', corto: 'ESCOBAR' },
+  { km: 54, ruta: 'SALIDA', lugar: 'LOMA VERDE', corto: 'LOMA VERDE' },                           // aprox
+  { km: 66, ruta: 'SALIDA', lugar: 'ING. OTAMENDI', corto: 'OTAMENDI' },                        // aprox
+  { km: 75, ruta: 'RUTA 6', lugar: 'CAMPANA', corto: 'CAMPANA' },
+  { km: 86, ruta: 'RUTA 12', lugar: 'ZÁRATE', corto: 'ZÁRATE' },                              // aprox
+];
+const DESTINOS = [{ km: 50, n: 'ESCOBAR' }, { km: 75, n: 'CAMPANA' }, { km: 86, n: 'ZÁRATE' }, { km: 300, n: 'ROSARIO' }];
+// Peajes: no hace falta que sean los reales (lo pidió el dueño). Uno cada 4 km desde los 3 km de la largada.
+const PEAJES = Array.from({ length: 60 }, (_, i) => START_KM + 3 + i * 4);
 
 export default {
   id: 'fitito',
@@ -67,18 +86,35 @@ export default {
       const side = srng() < 0.5 ? -1 : 1, r = srng();
       if (r < 0.45) segs[i].push({ t: 'euca', x: side * ROAD * (1.7 + srng() * 2.2), h: 9 + srng() * 6, k: srng() });
       else if (r < 0.58) segs[i].push({ t: 'vaca', x: side * ROAD * (1.9 + srng() * 2.5), dir: srng() < 0.5 ? -1 : 1, pasta: srng() < 0.5 });
-      else if (r < 0.63) segs[i].push({ t: 'cartel', x: 1.55 * ROAD, txt: pick(PLACES) });
       else if (r < 0.67) segs[i].push({ t: 'gauchito', x: side * 1.6 * ROAD });
       else if (r < 0.71) segs[i].push({ t: 'parrilla', x: side * 1.85 * ROAD });
       else if (r < 0.75) segs[i].push({ t: 'molino', x: side * ROAD * (3 + srng() * 2.5) });
       else if (r < 0.765) segs[i].push({ t: 'ypf', x: 2.3 * ROAD });
     }
-    for (let i = 150; i < N; i += 420) segs[i].push({ t: 'portico', txt: pick(PLACES) });
-    for (let i = 300; i < N; i += 1500) segs[i].push({ t: 'peaje' });
+    void pick;
+
+    // Carteles con los kilómetros reales: van por distancia absoluta (no se repiten con el paisaje).
+    // Mojón cada km, cartel de distancias cada 3 km, pórtico 400 m antes de cada salida y el peaje.
+    const kmItems = new Map();
+    const segOfKm = km => Math.round((km - START_KM) * KM / SEG);
+    const addKm = (km, it) => { const i = segOfKm(km); if (i > 2) { if (!kmItems.has(i)) kmItems.set(i, []); kmItems.get(i).push(it); } };
+    for (let km = START_KM + 1; km <= 300; km++) addKm(km, { t: 'mojon', x: 1.22 * ROAD, km });
+    for (let km = START_KM + 1.5; km <= 300; km += 3) {
+      const next = DESTINOS.filter(d => d.km > km + 0.5).slice(0, 2);
+      if (next.length) addKm(km, { t: 'cartel', x: 1.62 * ROAD, lines: next.map(d => [d.n, String(Math.round(d.km - km))]) });
+    }
+    // pórtico como los de la Panamericana: los próximos lugares, los escudos de las rutas y 'POR AUTOPISTA'
+    for (const s of SALIDAS) if (s.km - 0.4 > START_KM) {
+      const ahead = SALIDAS.filter(o => o.km >= s.km).slice(0, 4);
+      const rutas = [...new Set(['9', ...ahead.map(o => (o.ruta.match(/[0-9]+/) || [])[0]).filter(Boolean)])].sort((a, b) => a - b).slice(0, 3);
+      addKm(s.km - 0.4, { t: 'portico', lugares: ahead.map(o => o.corto), rutas });
+    }
+    const tolls = PEAJES.filter(km => km > START_KM).map(km => ({ km, z: segOfKm(km) * SEG, lane: Math.floor(srng() * LANES), warned: false }));
+    for (const tl of tolls) kmItems.set(segOfKm(tl.km), [...(kmItems.get(segOfKm(tl.km)) || []), { t: 'peaje', toll: tl }]);
 
     const S = {
       pos: 0, speed: 0, lane: 1, x: 0, started: false, alive: true,
-      obstacles: [], nextObs: SEG * 50, shake: 0, crash: null, cuadras: 0, smoke: [], smokeT: 0,
+      obstacles: [], nextObs: SEG * 50, shake: 0, crash: null, cuadras: 0, smoke: [], smokeT: 0, sinceBache: 5,
     };
     let endTimer = 0;
     const PLAYER_Z = CAM_H * DEPTH;
@@ -91,19 +127,29 @@ export default {
 
     // Fila nueva de 1 o 2 obstáculos. Nunca deja los 3 carriles tapados: ni sola, ni junto con
     // otra fila (de pozos o de autos) que venga pegada.
+    // Los pozos están quietos sobre la ruta y los autos vienen de frente: se compara cuándo llega cada cosa
+    // al Fitito (con la velocidad actual) en vez de dónde está. Así tampoco se tapan los 3 carriles.
+    const GAP_T = 0.9;                       // segundos: lo que llega más junto que esto cuenta como una sola fila
+    const arrival = (oz, ov) => (oz - (S.pos + PLAYER_Z)) / Math.max(1, S.speed + ov);
     function spawnRow() {
       const level = Math.min(1, S.cuadras / 50);
       const z = S.pos + PLAYER_Z + SEG * DRAW * 0.95;
-      const baches = rng() < 0.3;
-      const v = CAR_V;
-      const near = new Set(S.obstacles.filter(o => Math.abs(o.z - z) < SAFE_Z).map(o => o.lane));
-      const want = rng() < 0.4 + level * 0.3 ? 2 : 1;
+      S.sinceBache++;
+      // pozos: de a uno y cada tanto (nunca dos filas de pozos seguidas)
+      const baches = S.sinceBache >= 5 && rng() < 0.35;
+      const v = baches ? 0 : CAR_V;
+      const t = arrival(z, v);
+      // cerca del peaje no viene tráfico: solo la barrera del carril cerrado
+      if (tolls.some(tl => tl.z > S.pos && Math.abs(arrival(tl.z, 0) - t) < 1.4)) { S.nextObs = SEG * 4; return; }
+      const near = new Set(S.obstacles.filter(o => Math.abs(arrival(o.z, o.v) - t) < GAP_T).map(o => o.lane));
+      const want = baches ? 1 : rng() < 0.4 + level * 0.3 ? 2 : 1;
+      if (baches) S.sinceBache = 0;
       const combos = want === 2 ? [[0, 1], [1, 2], [0, 2]] : [[0], [1], [2]];
       for (let i = combos.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [combos[i], combos[j]] = [combos[j], combos[i]]; }
       let lanes = combos.find(c => new Set([...near, ...c]).size <= 2);
       if (!lanes) lanes = [0, 1, 2].filter(l => near.has(l)).slice(0, 1);
       for (const lane of lanes) {
-        if (baches) S.obstacles.push({ kind: 'bache', lane, z, x: laneX(lane) + (rng() - 0.5) * 0.16, w: 0.5, v, variant: (lane + S.cuadras) % 2 });
+        if (baches) S.obstacles.push({ kind: 'bache', lane, z, x: laneX(lane) + (rng() - 0.5) * 0.12, w: 0.5, v: 0, variant: (lane + S.cuadras) % 3 });
         else {
           const truck = rng() < 0.18;
           S.obstacles.push({ kind: truck ? 'camion' : 'auto', lane, z, x: laneX(lane), w: truck ? 0.5 : 0.36, v, model: Math.floor(rng() * CARS.length) });
@@ -116,7 +162,7 @@ export default {
       S.alive = false; S.shake = 1; S.crash = { kind, t: 0 };
       audio.lose(); buzz(kind === 'bache' ? [80, 40, 120] : [60, 40, 90]);
       report();
-      const title = { bache: '¡Volaste la suspensión!', camion: '¡Te comiste un camión!' }[kind] || '¡Choque de frente!';
+      const title = { bache: '¡Volaste la suspensión!', camion: '¡Te comiste un camión!', peaje: '¡Te llevaste puesta la barrera del peaje!' }[kind] || '¡Choque de frente!';
       endTimer = setTimeout(() => onEnd(S.cuadras, { title }), 1100);
     }
 
@@ -154,6 +200,15 @@ export default {
         if (before > -SEG * 0.5 && after < SEG * 0.5 && Math.abs(o.x - S.x) < (o.w + CAR_W) / 2 * 0.78) return die(o.kind);
       }
       S.obstacles = S.obstacles.filter(o => o.z > S.pos - SEG * 2);
+      // peaje: aviso de qué carril está cerrado y choque contra la barrera
+      for (const tl of tolls) {
+        if (!tl.warned && tl.z - pz < 0.45 * KM) {
+          tl.warned = true;
+          flash(toast, `Peaje: carril ${['izquierdo', 'del medio', 'derecho'][tl.lane]} cerrado`);
+          audio.tone(660, 0.12, 'square', 0.08); audio.tone(660, 0.12, 'square', 0.08, 0.2);
+        }
+        if (tl.z - prevPz > -SEG * 0.5 && tl.z - pz < SEG * 0.5 && Math.abs(laneX(tl.lane) - S.x) < (2 / 3 * 0.92 + CAR_W) / 2 * 0.8) return die('peaje');
+      }
     }
 
     /* ---------- cámara y ayudas de dibujo ---------- */
@@ -286,25 +341,72 @@ export default {
           glow(arm[0], arm[1], 2.2 * M * k, '255,214,150', 0.35);
           break;
         }
+        case 'mojon': {
+          // mojón kilométrico de ruta nacional: poste blanco con el número
+          const r = box(it.x - 0.22 * M, it.x + 0.22 * M, 0, 1.1 * M, z, z + 0.15 * M, { front: '#f4f4f0', side: '#cfcfc8', top: '#ffffff' });
+          if (r) {
+            ctx.fillStyle = '#1b1d20'; ctx.fillRect(r.x, r.y, r.w, r.h * 0.18);
+            text('KM', r.x + r.w / 2, r.y + r.h * 0.38, 0.16 * M * k, '#1b1d20', 800);
+            text(String(it.km), r.x + r.w / 2, r.y + r.h * 0.66, 0.28 * M * k, '#1b1d20');
+          }
+          break;
+        }
         case 'cartel': {
-          const [p0, p1] = [P(it.x - 1.2 * M, 0, z), P(it.x + 1.2 * M, 0, z)];
+          // cartel verde de distancias reales a los próximos destinos
+          const [p0, p1] = [P(it.x - 1.3 * M, 0, z), P(it.x + 1.3 * M, 0, z)];
           ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = Math.max(1, 0.12 * M * k);
           for (const p of [p0, p1]) { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0], P(0, 2.2 * M, z)[1]); ctx.stroke(); }
-          box(it.x - 1.8 * M, it.x + 1.8 * M, 2 * M, 3.8 * M, z, z + 0.15 * M, { front: '#1f7a4a', side: '#16603a', top: '#2a8d58' });
-          const [a, b] = [P(it.x - 1.8 * M, 3.8 * M, z), P(it.x + 1.8 * M, 2 * M, z)];
+          box(it.x - 2 * M, it.x + 2 * M, 2 * M, 4.2 * M, z, z + 0.15 * M, { front: '#1f7a4a', side: '#16603a', top: '#2a8d58' });
+          const [a, b] = [P(it.x - 2 * M, 4.2 * M, z), P(it.x + 2 * M, 2 * M, z)];
           ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = Math.max(1, 0.08 * M * k); ctx.strokeRect(a[0] + 0.12 * M * k, a[1] + 0.12 * M * k, b[0] - a[0] - 0.24 * M * k, b[1] - a[1] - 0.24 * M * k);
-          text(it.txt[0], (a[0] + b[0]) / 2, a[1] + (b[1] - a[1]) * 0.36, 0.55 * M * k, '#fff');
-          text(it.txt[1], (a[0] + b[0]) / 2, a[1] + (b[1] - a[1]) * 0.7, 0.45 * M * k, '#fff', 700);
+          const w = b[0] - a[0], h = b[1] - a[1];
+          it.lines.forEach(([name, km], i) => {
+            const y = a[1] + h * (it.lines.length === 1 ? 0.5 : 0.33 + i * 0.36), size = 0.42 * M * k;
+            if (size < 4) return;
+            ctx.font = `900 ${Math.round(size)}px Chivo, sans-serif`; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+            ctx.textAlign = 'left'; ctx.fillText(name, a[0] + w * 0.1, y);
+            ctx.textAlign = 'right'; ctx.fillText(km, a[0] + w * 0.9, y);
+          });
           break;
         }
         case 'portico': {
+          // pórtico 400 m antes de una salida real
           const c = { front: '#9aa0a8', side: '#7b8088', top: '#b9bfc6' };
           for (const s of [-1, 1]) box(s * 1.38 * ROAD - 0.15 * M, s * 1.38 * ROAD + 0.15 * M, 0, 7 * M, z, z + 0.3 * M, c);
           box(-1.38 * ROAD, 1.38 * ROAD, 6.6 * M, 7 * M, z, z + 0.3 * M, c);
-          const r = box(-0.85 * ROAD, 0.85 * ROAD, 4.6 * M, 6.6 * M, z - 0.05 * M, z + 0.1 * M, { front: '#1f7a4a', side: '#16603a', top: '#2a8d58' });
+          const r = box(-1.02 * ROAD, 1.02 * ROAD, 4.3 * M, 6.6 * M, z - 0.05 * M, z + 0.1 * M, { front: '#16704a', side: '#105a3a', top: '#1f8556' });
           if (r) {
-            text(`${it.txt[0]}  ${it.txt[1]}`, r.x + r.w / 2, r.y + r.h * 0.35, 0.65 * M * k, '#fff');
-            text('PANAMERICANA · RN 9', r.x + r.w / 2, r.y + r.h * 0.72, 0.42 * M * k, '#fff', 700);
+            ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = Math.max(1, 0.07 * M * k);
+            ctx.strokeRect(r.x + 0.1 * M * k, r.y + 0.1 * M * k, r.w - 0.2 * M * k, r.h - 0.2 * M * k);
+            // renglón de arriba: lugares separados por puntos y, a la derecha, RUTAS con sus escudos
+            const size = 0.4 * M * k, y1 = r.y + r.h * 0.3;
+            if (size >= 4) {
+              const sh = size * 1.25, gap = sh * 0.25;
+              let xr = r.x + r.w * 0.97;
+              ctx.textBaseline = 'middle';
+              for (let i = it.rutas.length - 1; i >= 0; i--) {
+                const xs = xr - sh;
+                ctx.fillStyle = '#ffffff'; rrect(ctx, xs, y1 - sh / 2, sh, sh, sh * 0.25); ctx.fill();
+                ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = Math.max(1, sh * 0.08); rrect(ctx, xs + sh * 0.1, y1 - sh * 0.4, sh * 0.8, sh * 0.8, sh * 0.18); ctx.stroke();
+                ctx.font = `900 ${Math.round(size * 0.82)}px Chivo, sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#1b1d20'; ctx.fillText(it.rutas[i], xs + sh / 2, y1 + sh * 0.04);
+                xr = xs - gap;
+              }
+              ctx.font = `900 ${Math.round(size)}px Chivo, sans-serif`; ctx.fillStyle = '#fff'; ctx.textAlign = 'right';
+              ctx.fillText('RUTAS', xr - gap, y1);
+              const roomL = r.x + r.w * 0.04, roomR = xr - gap - ctx.measureText('RUTAS').width - sh * 0.6;
+              let lug = it.lugares, line = lug.join(' · ');
+              ctx.textAlign = 'left';
+              while (lug.length > 1 && ctx.measureText(line).width > roomR - roomL) { lug = lug.slice(0, -1); line = lug.join(' · '); }
+              ctx.fillText(line, roomL, y1);
+            }
+            // renglón de abajo: POR AUTOPISTA y una flecha sobre cada carril
+            const y2 = r.y + r.h * 0.74;
+            text('POR AUTOPISTA', r.x + r.w / 2, y2, 0.36 * M * k, '#fff', 800);
+            for (const l of [0, 2]) {                                   // flechas sobre los carriles de los costados
+              const p = P(laneX(l) * ROAD, 0, z), a = 0.22 * M * k;
+              ctx.fillStyle = '#fff'; ctx.beginPath();
+              ctx.moveTo(p[0] - a, y2 - a * 0.6); ctx.lineTo(p[0] + a, y2 - a * 0.6); ctx.lineTo(p[0], y2 + a * 0.8); ctx.closePath(); ctx.fill();
+            }
           }
           break;
         }
@@ -362,16 +464,60 @@ export default {
           break;
         }
         case 'peaje': {
-          const c = { front: '#d0d4da', side: '#a8aeb6', top: '#e4e7ea' };
-          for (const s of [-1, 1]) {
-            box(s * 1.5 * ROAD - 1.4 * M, s * 1.5 * ROAD + 1.4 * M, 0, 2.6 * M, z, z + 2.5 * M, { front: '#ece8de', side: '#cbc5b8', top: '#c0392b' });
-            box(s * 1.32 * ROAD - 0.2 * M, s * 1.32 * ROAD + 0.2 * M, 0, 5.6 * M, z + 0.5 * M, z + 0.9 * M, c);
+          // Peaje como los de la Panamericana: techo de hormigón, un cartel verde con su luz sobre cada carril,
+          // isletas con casilla y frente a rayas rojas y blancas, y una barrera por carril.
+          // En un carril (al azar) la barrera está baja: si pasás por ahí, chocás.
+          const cl = it.toll.lane, conc = { front: '#cfccc4', side: '#a9a69e', top: '#e0ddd5' };
+          const islands = [-1.06 * ROAD, -ROAD / 3, ROAD / 3, 1.06 * ROAD];
+          const stripes = (rect, w) => {                     // franjas rojas y blancas en diagonal sobre un frente
+            if (!rect) return;
+            ctx.save(); ctx.beginPath(); ctx.rect(rect.x, rect.y, rect.w, rect.h); ctx.clip();
+            ctx.fillStyle = '#f4f4f4'; ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+            ctx.strokeStyle = '#d6362b'; ctx.lineWidth = w;
+            for (let d = -rect.h; d < rect.w + rect.h; d += w * 2.2) {
+              ctx.beginPath(); ctx.moveTo(rect.x + d, rect.y + rect.h); ctx.lineTo(rect.x + d + rect.h * 0.7, rect.y); ctx.stroke();
+            }
+            ctx.restore();
+          };
+          // columnas de los costados
+          for (const s of [-1, 1]) box(s * 1.42 * ROAD - 0.35 * M, s * 1.42 * ROAD + 0.35 * M, 0, 5.2 * M, z + 0.3 * M, z + 1.0 * M, conc);
+          // isletas: base, casilla y frente a rayas
+          for (const xi of islands) {
+            box(xi - 0.6 * M, xi + 0.6 * M, 0, 0.25 * M, z - 2.5 * M, z + 4 * M, conc);
+            const cab = box(xi - 0.45 * M, xi + 0.45 * M, 0.25 * M, 2.5 * M, z + 0.6 * M, z + 2.4 * M, { front: '#e9e6dd', side: '#c8c4b8', top: '#8d949c' });
+            if (cab) { ctx.fillStyle = '#34506b'; ctx.fillRect(cab.x + cab.w * 0.15, cab.y + cab.h * 0.2, cab.w * 0.7, cab.h * 0.35); }
+            box(xi - 0.06 * M, xi + 0.06 * M, 2.5 * M, 5.0 * M, z + 1.2 * M, z + 1.4 * M, conc);             // pata del techo
+            stripes(box(xi - 0.5 * M, xi + 0.5 * M, 0.25 * M, 1.3 * M, z - 2.5 * M, z - 1.9 * M, { front: '#f4f4f4', side: '#d6362b', top: '#f6b40e' }), Math.max(2, 0.12 * M * K(z - 2.5 * M)));
+            const yb = P(xi, 1.45 * M, z - 2.2 * M), rb = 0.14 * M * K(z - 2.2 * M);
+            ellipse(yb[0], yb[1], rb, rb, '#f6b40e');                                                      // baliza amarilla
           }
-          const r = box(-1.6 * ROAD, 1.6 * ROAD, 5.6 * M, 6.6 * M, z, z + 3 * M, { front: '#f2c230', side: '#c99a1d', top: '#ffd659' });
-          if (r) {
-            text('PEAJE', r.x + r.w / 2, r.y + r.h / 2, 0.7 * M * k, '#2b2b2b');
-            for (const l of [-2 / 3, 0, 2 / 3]) { const p = P(l * ROAD, 5.35 * M, z); ellipse(p[0], p[1], 0.2 * M * k, 0.2 * M * k, '#3ccf4e'); glow(p[0], p[1], 0.7 * M * k, '80,255,110', 0.4); }
-          }
+          // techo de hormigón y carteles por carril
+          box(-1.45 * ROAD, 1.45 * ROAD, 4.9 * M, 6.0 * M, z, z + 1.6 * M, conc);
+          [0, 1, 2].forEach(l => {
+            const xc = laneX(l) * ROAD, hw = ROAD / 3 * 0.8, closed = l === cl;
+            const sign = box(xc - hw, xc + hw, 5.05 * M, 5.85 * M, z - 0.06 * M, z, closed
+              ? { front: '#b3261e', side: '#8a1c16', top: '#c73a31' } : { front: '#1f8a4c', side: '#166638', top: '#2a9d5b' });
+            if (sign) {
+              ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = Math.max(1, 0.05 * M * k); ctx.strokeRect(sign.x + 0.08 * M * k, sign.y + 0.08 * M * k, sign.w - 0.16 * M * k, sign.h - 0.16 * M * k);
+              text(closed ? 'CERRADO' : 'TELEPEAJE', sign.x + sign.w / 2, sign.y + sign.h / 2, 0.36 * M * k, '#fff', 900);
+            }
+            const lp = P(xc, 4.7 * M, z - 0.05 * M), d = 0.18 * M * k;
+            if (closed) {
+              ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = Math.max(2, 0.09 * M * k);
+              ctx.beginPath(); ctx.moveTo(lp[0] - d, lp[1] - d); ctx.lineTo(lp[0] + d, lp[1] + d); ctx.moveTo(lp[0] + d, lp[1] - d); ctx.lineTo(lp[0] - d, lp[1] + d); ctx.stroke();
+              glow(lp[0], lp[1], 0.7 * M * k, '255,60,40', 0.5);
+            } else { ellipse(lp[0], lp[1], d, d, '#3ccf4e'); glow(lp[0], lp[1], 0.6 * M * k, '80,255,110', 0.4); }
+            // barrera de cada carril: sale de la isleta de la izquierda; levantada salvo en el carril cerrado
+            const px = xc - ROAD / 3 + 0.5 * M;
+            box(px - 0.15 * M, px + 0.15 * M, 0, 1.1 * M, z - 0.4 * M, z - 0.1 * M, { front: '#f6b40e', side: '#c99a1d', top: '#ffd659' });
+            if (closed) {
+              const bar = box(px, xc + ROAD / 3 - 0.5 * M, 0.85 * M, 1.05 * M, z - 0.3 * M, z - 0.2 * M, { front: '#f4f4f4', side: '#d0d0d0', top: '#ffffff' });
+              if (bar) { ctx.fillStyle = '#d6362b'; for (let i = 0; i < 8; i += 2) ctx.fillRect(bar.x + bar.w * i / 8, bar.y, bar.w / 8, bar.h); }
+            } else {
+              const up = box(px - 0.06 * M, px + 0.06 * M, 1.1 * M, 3.4 * M, z - 0.3 * M, z - 0.2 * M, { front: '#f4f4f4', side: '#d0d0d0', top: '#ffffff' });
+              if (up) { ctx.fillStyle = '#d6362b'; for (let i = 0; i < 8; i += 2) ctx.fillRect(up.x, up.y + up.h * i / 8, up.w, up.h / 8); }
+            }
+          });
           break;
         }
       }
@@ -458,18 +604,36 @@ export default {
     }
 
     function drawBache(o, z, now) {
-      const cx = o.x * ROAD, r = 0.42 * o.w * ROAD, k = K(z), zc = z + 0.7 * M;
+      const cx = o.x * ROAD, r = 0.5 * o.w * ROAD, k = K(z), zc = z + 1.2 * M;
       if (z - camZ < NEAR) return;
-      const ring = (rr, fill) => poly(Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2; return P(cx + Math.cos(a) * rr * (1 + 0.12 * Math.sin(i * 3.1)), 0, zc + Math.sin(a) * rr * 0.75); }), fill);
-      ring(r * 1.12, '#5a5b60'); ring(r, '#1c1d20'); ring(r * 0.55, 'rgba(90,120,160,.55)');
-      const hl = P(cx - r * 0.2, 0, zc - r * 0.1);
-      ellipse(hl[0], hl[1], 0.35 * M * k, 0.06 * M * k, 'rgba(255,220,180,.5)');
+      // Pozo de verdad: grietas que salen, borde de asfalto roto, la pared de adentro (la que mira a la cámara),
+      // fondo con agua y pedacitos de asfalto alrededor. El contorno es irregular y distinto en cada pozo.
+      const jag = i => 1 + 0.16 * Math.sin(i * 2.7 + o.lane * 1.3) + 0.08 * Math.sin(i * 5.3 + o.variant);
+      const pt = (a, rr, y = 0) => P(cx + Math.cos(a) * rr, y, zc + Math.sin(a) * rr * 1.7);
+      const n = 18, ang = i => i / n * Math.PI * 2;
+      ctx.strokeStyle = 'rgba(22,22,25,.85)'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1, 0.05 * M * k);
+      for (let i = 0; i < 7; i++) {
+        let a = i / 7 * Math.PI * 2 + 0.4 * Math.sin(i * 1.9), rr = r * 1.1;
+        const p0 = pt(a, rr); ctx.beginPath(); ctx.moveTo(p0[0], p0[1]);
+        for (let s = 0; s < 3; s++) { rr += r * (0.28 + 0.12 * Math.sin(i + s)); a += 0.35 * Math.sin(i * 3 + s * 2); const p = pt(a, rr); ctx.lineTo(p[0], p[1]); }
+        ctx.stroke();
+      }
+      poly(Array.from({ length: n }, (_, i) => pt(ang(i), r * 1.2 * jag(i))), '#75777d');          // borde roto
+      poly(Array.from({ length: n }, (_, i) => pt(ang(i), r * jag(i))), '#121315');                 // agujero
+      const far = Array.from({ length: n / 2 + 1 }, (_, i) => i).map(i => [ang(i), r * jag(i)]);    // mitad de atrás
+      poly([...far.map(([a, rr]) => pt(a, rr)), ...far.reverse().map(([a, rr]) => pt(a, rr * 0.92, -0.5 * M))], '#3c3e43');   // pared de adentro
+      poly(Array.from({ length: 12 }, (_, i) => pt(i / 12 * Math.PI * 2, r * 0.55, -0.5 * M)), 'rgba(80,110,150,.6)');          // agua
+      const sh = pt(-0.6, r * 0.25, -0.49 * M); ellipse(sh[0], sh[1], 0.3 * M * k, 0.05 * M * k, 'rgba(255,225,190,.45)');
+      for (let i = 0; i < 9; i++) {                                                                   // pedacitos de asfalto
+        const a = i * 2.39 + o.lane, rr = r * (1.3 + 0.35 * ((i * 7) % 3) / 2), p = pt(a, rr), s = (0.08 + 0.05 * (i % 3)) * M * k;
+        ctx.fillStyle = i % 2 ? '#2a2b2f' : '#8a8c92'; ctx.fillRect(p[0] - s / 2, p[1] - s / 3, s, s * 0.6);
+      }
       if (o.variant === 0) {
         // rama clavada para avisar
         const b = P(cx + r * 0.1, 0, zc), t = P(cx - r * 0.25, 1.1 * M, zc);
         ctx.strokeStyle = '#6b4426'; ctx.lineWidth = Math.max(1, 0.08 * M * k); ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(t[0], t[1]); ctx.stroke();
         for (let i = 0; i < 6; i++) ellipse(t[0] + Math.cos(i * 1.1 + now * 0.004) * 0.25 * M * k, t[1] + Math.sin(i * 1.7) * 0.18 * M * k, 0.14 * M * k, 0.09 * M * k, i % 2 ? '#4e8a3a' : '#76b456');
-      } else {
+      } else if (o.variant === 1) {
         // goma vieja parada en el pozo
         const p = P(cx, 0.4 * M, zc);
         ellipse(p[0], p[1], 0.26 * M * k, 0.42 * M * k, '#16171a');
@@ -514,7 +678,10 @@ export default {
       // todo lo que tiene altura, de atrás hacia adelante, apareciendo desde la bruma
       const list = [];
       const i0 = Math.floor((camZ + NEAR) / SEG), i1 = Math.floor((camZ + FOG1) / SEG);
-      for (let i = i1; i >= i0; i--) for (const it of segs[((i % N) + N) % N]) list.push({ z: i * SEG, f: () => drawItem(it, i * SEG, now) });
+      for (let i = i1; i >= i0; i--) {
+        for (const it of segs[((i % N) + N) % N]) list.push({ z: i * SEG, f: () => drawItem(it, i * SEG, now) });
+        for (const it of kmItems.get(i) || []) list.push({ z: i * SEG, f: () => drawItem(it, i * SEG, now) });
+      }
       const pz = S.pos + PLAYER_Z;
       for (const o of S.obstacles) {
         if (o.z - camZ > FOG1 || o.z - camZ < NEAR) continue;
@@ -557,7 +724,7 @@ export default {
 
     return {
       destroy() { stop(); unbind(); clearTimeout(endTimer); st.destroy(); pill.remove(); toast.remove(); },
-      _state: S, _update: update, _move: move, _draw: draw,
+      _state: S, _update: update, _move: move, _draw: draw, _tolls: tolls,
     };
   },
 };

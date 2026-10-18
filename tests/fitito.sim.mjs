@@ -28,12 +28,13 @@ for (let seed = 1; seed <= 40; seed++) {
   while (S.alive && t < 120000) {
     inst._update(16); t += 16;
     const pz = S.pos + PZ;
-    for (const a of S.obstacles) {
-      if (new Set(S.obstacles.filter(b => Math.abs(b.z - a.z) < SEG * 6).map(b => b.lane)).size >= 3) blocked++;
-    }
-    // piloto: va al carril cuyo próximo obstáculo llega más tarde, de a un toque
-    const arr = o => (o.z - pz) / Math.max(1, S.speed + o.v);
-    const first = l => Math.min(9, ...S.obstacles.filter(o => o.lane === l && arr(o) > -0.08).map(arr));
+    // tapados: lo que está pasando por el auto en este momento (autos, pozos quietos y la barrera del peaje)
+    const here = [...S.obstacles, ...inst._tolls.map(tl => ({ z: tl.z, lane: tl.lane, v: 0 }))].filter(o => Math.abs(o.z - pz) < SEG * 1.5);
+    if (new Set(here.map(o => o.lane)).size >= 3) blocked++;
+    // piloto: va al carril cuyo próximo obstáculo llega más tarde, de a un toque (la barrera del peaje cuenta)
+    const all = [...S.obstacles, ...inst._tolls.map(tl => ({ z: tl.z, lane: tl.lane, v: 0 }))];
+    const arr = o => (o.z - pz) / Math.max(1, S.speed + (o.v || 0));
+    const first = l => Math.min(9, ...all.filter(o => o.lane === l && arr(o) > -0.08).map(arr));
     const f = [0, 1, 2].map(first);
     const target = [0, 1, 2].reduce((b, l) => (f[l] > f[b] + 0.05 || (Math.abs(f[l] - f[b]) <= 0.05 && Math.abs(l - S.lane) < Math.abs(b - S.lane))) ? l : b, S.lane);
     if (target !== S.lane && f[S.lane] < 1.3 && t - lastMove > 140) {

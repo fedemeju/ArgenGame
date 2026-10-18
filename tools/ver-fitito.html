@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<!-- Pone el Fitito en un kilómetro dado para ver carteles, peaje y pozos. ?km=33.97&pozo=1&seed=3 -->
+<style>body{margin:0;background:#222}#g{position:relative;width:100vw;height:100vh;overflow:hidden}</style>
+<div id="g"></div>
+<script type="module">
+import { GAMES } from './games/index.js';
+import { loadCustomArt } from './js/art.js';
+const q = new URLSearchParams(location.search);
+loadCustomArt(); await new Promise(r => setTimeout(r, 600));
+const inst = GAMES.fitito.mount(document.getElementById('g'), { seed: Number(q.get('seed') || 3), onScore() {}, onEnd() {} });
+const S = inst._state, KM = 80000, PZ = 1150 / Math.tan(50 * Math.PI / 180), M = 2000 / 5.5;
+S.pos = (Number(q.get('km') || 34) - 30) * KM - PZ; S.speed = 6000; S.lane = 1; S.x = 0;
+if (q.get('pozo')) S.obstacles.push({ kind: 'bache', lane: Number(q.get('pozo')), z: S.pos + PZ + Number(q.get("dist") || 18) * M, x: -1 + (2 * Number(q.get('pozo')) + 1) / 3, w: 0.5, v: 0, variant: 2 });
+inst._draw(16, performance.now());
+</script>
