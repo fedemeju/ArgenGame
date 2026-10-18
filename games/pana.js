@@ -5,7 +5,60 @@ import { assetUrl, getCustom } from '../js/art.js';
 // contraria se espejan. Los que no tienen imagen se dibujan con cajas en código.
 // (la primera imagen del taxi se veía demasiado de costado: hace falta una con la cámara más alta)
 const AUTO_IMG = {};
-import { loadModel, renderOblique } from '../js/model3d.js';
+
+// Profundidad que ocupa un vehículo dentro de su carril (antes 0,17 a 0,83: se veían muy anchos)
+const HALF_LO = 0.25, HALF_HI = 0.75;
+
+// El ciclista de delivery como modelo 3D chiquito (en casilleros). a: hacia dónde mira
+// (0 arriba, π/2 derecha, -π/2 izquierda, π abajo). Se gira de verdad, así se ve bien para cualquier lado.
+const rgbHex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+export function riderTris(a) {
+  const tris = [], ca = Math.cos(a), sa = Math.sin(a);
+  // ejes propios: lz hacia adelante, lx a la derecha, y arriba
+  const W = ([lx, y, lz]) => [lx * ca + lz * sa, y, -lx * sa + lz * ca];
+  const quad = (p, c) => { tris.push({ v: [W(p[0]), W(p[1]), W(p[2])], c }, { v: [W(p[0]), W(p[2]), W(p[3])], c }); };
+  const box = (x0, x1, y0, y1, z0, z1, col) => {
+    const c = rgbHex(col);
+    quad([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], c);
+    quad([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], c);
+    quad([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], c);
+    quad([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], c);
+    quad([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], c);
+    quad([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], c);
+  };
+  const wheel = (lz, r) => {                                   // rueda: octógono parado, de canto según la marcha
+    const c = rgbHex('#1b1d20'), hub = rgbHex('#9aa0a8'), n = 8;
+    const pt = (i, rr) => [lz + rr * Math.cos(i * Math.PI * 2 / n), r + rr * Math.sin(i * Math.PI * 2 / n)];
+    for (const lx of [-0.025, 0.025]) for (let i = 1; i < n - 1; i++) {
+      const [a0, b0] = pt(0, r), [a1, b1] = pt(i, r), [a2, b2] = pt(i + 1, r);
+      tris.push({ v: [W([lx, b0, a0]), W([lx, b1, a1]), W([lx, b2, a2])], c });
+    }
+    for (let i = 0; i < n; i++) {
+      const [a1, b1] = pt(i, r), [a2, b2] = pt(i + 1, r);
+      quad([[-0.025, b1, a1], [0.025, b1, a1], [0.025, b2, a2], [-0.025, b2, a2]], c);
+    }
+    for (const lx of [-0.03, 0.03]) for (let i = 1; i < n - 1; i++) {
+      const [a0, b0] = pt(0, r * 0.35), [a1, b1] = pt(i, r * 0.35), [a2, b2] = pt(i + 1, r * 0.35);
+      tris.push({ v: [W([lx, b0, a0]), W([lx, b1, a1]), W([lx, b2, a2])], c: hub });
+    }
+  };
+  wheel(-0.26, 0.13); wheel(0.26, 0.13);
+  box(-0.018, 0.018, 0.17, 0.21, -0.26, 0.26, '#3a3f45');      // cuadro
+  box(-0.018, 0.018, 0.21, 0.36, -0.09, -0.05, '#3a3f45');     // caño del asiento
+  box(-0.04, 0.04, 0.36, 0.39, -0.14, -0.02, '#1b1d20');       // asiento
+  box(-0.018, 0.018, 0.21, 0.43, 0.2, 0.24, '#3a3f45');        // caño del manubrio
+  box(-0.14, 0.14, 0.43, 0.46, 0.19, 0.23, '#1b1d20');         // manubrio
+  for (const s of [-1, 1]) box(s * 0.03, s * 0.09, 0.14, 0.38, -0.04, 0.05, '#2f3b4a');            // piernas
+  box(-0.11, 0.11, 0.38, 0.66, -0.12, 0.05, '#34495e');        // campera
+  for (const s of [-1, 1]) box(s * 0.09, s * 0.14, 0.5, 0.57, -0.02, 0.22, '#34495e');             // brazos al manubrio
+  box(-0.135, 0.135, 0.42, 0.72, -0.32, -0.12, '#d62828');     // mochila de delivery
+  box(-0.135, 0.135, 0.72, 0.75, -0.32, -0.12, '#f6b40e');     // tapa amarilla
+  box(-0.07, 0.07, 0.66, 0.79, -0.05, 0.08, '#e0b48a');        // cabeza
+  box(-0.085, 0.085, 0.77, 0.86, -0.07, 0.1, '#f6b40e');       // casco
+  box(-0.015, 0.015, 0.86, 0.87, -0.07, 0.1, '#d62828');       // franja del casco
+  return tris;
+}
+import { loadModel, renderOblique, renderWorld } from '../js/model3d.js';
 
 // Modelos 3D del dueño (assets/modelos/). up y front: cómo viene orientado cada archivo.
 // Los que no tienen modelo se dibujan con cajas en código.
@@ -312,7 +365,7 @@ export default {
     }
 
     function vehicle3d(v, x, r) {
-      const len = v.len, d = v.dir, z0 = r + 0.17, z1 = r + 0.83;
+      const len = v.len, d = v.dir, z0 = r + HALF_LO, z1 = r + HALF_HI;
       const img = AUTO_IMG[v.kind] && getCustom(AUTO_IMG[v.kind]);
       if (img) {
         // La imagen viene de una cámara un poco más baja que la del juego: se agranda apenas y se estira de alto
@@ -379,32 +432,19 @@ export default {
       }
     }
 
-    function rider3d(x, z, hop, ang, wob, now) {
-      // la bici apunta hacia donde se movió; la cámara ve la espalda con la mochila
-      const c = x + 0.5, m = z + 0.5, y0 = hop;
+    // El ciclista: una imagen por cada sentido (se arma una vez con el modelo 3D y la profundidad por píxel)
+    const riderSprites = new Map();
+    function rider3d(x, z, hop, ang, wob) {
+      const c = x + 0.5, m = z + 0.5;
       const [sx, sy] = P(c + 0.06, 0.005, m - 0.05);
-      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(sx, sy, 0.24 * cw, 0.12 * rowD, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.save();
-      const [px, py] = P(c, y0, m); ctx.translate(px, py); ctx.rotate(wob); ctx.translate(-px, -py);
-      const side = Math.abs(Math.sin(ang)) > 0.5;                         // va de costado: la bici se ve de perfil
-      if (side) {
-        box(c - 0.32, c + 0.32, y0 + 0.12, y0 + 0.16, m - 0.03, m + 0.03, '#1b1d20');
-        for (const dx of [-0.26, 0.26]) { const [wx, wy] = P(c + dx, y0 + 0.13, m - 0.03); ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = Math.max(1.5, 0.035 * hS); ctx.beginPath(); ctx.arc(wx, wy, 0.13 * hS, 0, Math.PI * 2); ctx.stroke(); }
-      } else {
-        box(c - 0.03, c + 0.03, y0 + 0.02, y0 + 0.28, m - 0.34, m - 0.26, '#1b1d20');
-        box(c - 0.03, c + 0.03, y0 + 0.02, y0 + 0.28, m + 0.26, m + 0.34, '#1b1d20');
-        box(c - 0.02, c + 0.02, y0 + 0.2, y0 + 0.24, m - 0.3, m + 0.3, '#1b1d20');
-        box(c - 0.17, c + 0.17, y0 + 0.36, y0 + 0.39, m + 0.24, m + 0.27, '#1b1d20');
-      }
-      box(c - 0.12, c + 0.12, y0 + 0.3, y0 + 0.66, m - 0.08, m + 0.1, '#2f3b4a');          // cuerpo
-      box(c - 0.15, c + 0.15, y0 + 0.36, y0 + 0.72, m - 0.3, m - 0.08, '#d62828', { top: '#f6b40e' }); // mochila
-      quad([[c - 0.15, y0 + 0.62, m - 0.302], [c + 0.15, y0 + 0.62, m - 0.302], [c + 0.15, y0 + 0.66, m - 0.302], [c - 0.15, y0 + 0.66, m - 0.302]], '#f6b40e');
-      const [hx, hy] = P(c, y0 + 0.82, m + 0.02), hr = 0.12 * hS;
-      ctx.fillStyle = '#e0b48a'; ctx.beginPath(); ctx.arc(hx, hy + hr * 0.35, hr * 0.7, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#f6b40e'; ctx.beginPath(); ctx.arc(hx, hy, hr, Math.PI, 0); ctx.lineTo(hx + hr, hy + hr * 0.15); ctx.lineTo(hx - hr, hy + hr * 0.15); ctx.fill();
-      ctx.fillStyle = '#d62828'; ctx.fillRect(hx - hr * 0.12, hy - hr, hr * 0.24, hr * 1.1);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(sx, sy, 0.26 * cw, 0.13 * rowD, 0, 0, Math.PI * 2); ctx.fill();
+      const key = [ang.toFixed(3), cw.toFixed(1), rowD.toFixed(1), hS.toFixed(1)].join('|');
+      if (!riderSprites.has(key)) riderSprites.set(key, renderWorld(riderTris(ang), { cw, rowD, hS, skew: SKEW, dpr: Math.min(2, st.dpr) }));
+      const spr = riderSprites.get(key);
+      const [px, py] = P(c, hop, m);
+      ctx.save(); ctx.translate(px, py); ctx.rotate(wob);
+      ctx.drawImage(spr.img, spr.dx, spr.dy, spr.w, spr.h);
       ctx.restore();
-      void now;
     }
 
     function casquito3d(x, z) {

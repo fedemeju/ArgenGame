@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<!-- Muestra el ciclista de Pana Express en los 4 sentidos, en grande, con la cámara del juego. ?cw=160 -->
+<style>body{margin:0;background:#4b5058;font:13px system-ui,sans-serif;color:#eee}.g{display:flex;gap:28px;padding:16px;align-items:flex-end}figure{margin:0;text-align:center}</style>
+<div class="g" id="out"></div>
+<script type="module">
+import { renderWorld } from './js/model3d.js';
+import { riderTris } from './games/pana.js';
+const cw = Number(new URLSearchParams(location.search).get('cw') || 160);
+for (const [name, a] of [['arriba', 0], ['derecha', Math.PI / 2], ['izquierda', -Math.PI / 2], ['abajo', Math.PI]]) {
+  const s = renderWorld(riderTris(a), { cw, rowD: cw * 1.25, hS: cw * 0.8, skew: 0.3, dpr: 1 });
+  const f = document.createElement('figure'); f.appendChild(s.img);
+  f.insertAdjacentHTML('beforeend', `<figcaption>${name}</figcaption>`);
+  document.getElementById('out').appendChild(f);
+}
+</script>

@@ -105,13 +105,20 @@ export async function parseGLB(buf, { up = 'y', front = '+x' } = {}) {
 
 // Dibuja el modelo con la cámara oblicua del juego. len: largo deseado en casilleros; dir: 1 trompa a la
 // derecha, -1 a la izquierda. Devuelve la imagen y dónde va respecto del punto (cola, piso, centro del carril).
-export function renderOblique(model, { len, dir, cw, rowD, hS, skew, dpr = 1 }) {
+export function renderOblique(model, { len, dir, ...view }) {
   const s = len / model.len;
+  const tris = model.tris.map(t => ({ v: t.v.map(([x, y, z]) => (dir > 0 ? [x * s, y * s, z * s] : [len - x * s, y * s, -z * s])), c: t.c }));
+  return { ...renderWorld(tris, view), hgt: model.hgt * s };
+}
+
+// Dibuja triángulos que ya están en coordenadas del juego (casilleros) con la cámara oblicua.
+// La imagen queda referida al punto (0, 0, 0): se dibuja en P(origen) + (dx, dy).
+export function renderWorld(tris, { cw, rowD, hS, skew, dpr = 1 }) {
   const proj = (x, y, z) => [(x + z * skew) * cw, -z * rowD - y * hS];
   const dview = [-skew, -rowD / hS, 1];                   // dirección "hacia el fondo" de la cámara
   const L = norm([-0.35, 1, -0.55]);                       // luz de arriba, de adelante y de la izquierda
-  const items = model.tris.map(t => {
-    const w = t.v.map(([x, y, z]) => (dir > 0 ? [x * s, y * s, z * s] : [len - x * s, y * s, -z * s]));
+  const items = tris.map(t => {
+    const w = t.v;
     const n0 = norm(cross(sub(w[1], w[0]), sub(w[2], w[0])));
     const n = dot(n0, dview) > 0 ? n0.map(v => -v) : n0;   // la cara que mira a la cámara
     const k = 0.58 + 0.42 * Math.max(0, dot(n, L));
@@ -154,7 +161,7 @@ export function renderOblique(model, { len, dir, cw, rowD, hS, skew, dpr = 1 }) 
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
   g.drawImage(big, 0, 0, c.width, c.height);
-  return { img: c, dx: x0, dy: y0, w: x1 - x0, h: y1 - y0, hgt: model.hgt * s };
+  return { img: c, dx: x0, dy: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
