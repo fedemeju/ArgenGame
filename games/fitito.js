@@ -13,7 +13,7 @@ const DRAW = 180;           // segmentos donde aparece el tráfico
 const MAX_SPEED = SEG * 60; // unidades por segundo
 const CUADRA = 8000;        // 100 m de juego
 const LANES = 3;
-const CAR_W = 0.34;         // ancho del Fitito en medios-anchos de calle
+const CAR_W = 0.29;         // ancho del Fitito en medios-anchos de calle (antes 0,34: se veía muy grande)
 
 // cámara y bruma (M = un metro en unidades del mundo)
 const M = ROAD / 5.5;
@@ -654,12 +654,12 @@ export default {
         if (S.crash.kind === 'bache') { sy -= Math.sin(t * Math.PI) * H * 0.16; rot = t * 0.6; }
         else rot = Math.sin(S.crash.t / 50) * 0.08;
       } else rot = Math.max(-1, Math.min(1, (laneX(S.lane) - S.x) * 4)) * 0.05;
-      ellipse(sx, sy, 1.15 * s, 0.25 * s, 'rgba(10,10,15,.4)');
+      ellipse(sx, sy, 0.98 * s, 0.22 * s, 'rgba(10,10,15,.4)');
       ctx.save(); ctx.translate(sx, sy); ctx.rotate(rot);
       const own = getCustom('fititoAtras');
       // imagen del dueño: el ancho con paragolpes es un poco más que el auto (CAR_W)
       if (own) { const w = CAR_W * ROAD / M * 1.08 * s, h = w * own.height / own.width; ctx.drawImage(own, -w / 2, -h, w, h); }
-      else { ctx.scale(s, -s); paintFitito(ctx, now); }
+      else { ctx.scale(s * 0.85, -s * 0.85); paintFitito(ctx, now); }
       ctx.restore();
     }
 
