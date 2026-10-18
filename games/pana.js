@@ -3,7 +3,8 @@ import { assetUrl, getCustom } from '../js/art.js';
 
 // Imágenes de vehículos del dueño (de costado, vistos desde arriba, mirando a la derecha). Los de la mano
 // contraria se espejan. Los que no tienen imagen se dibujan con cajas en código.
-const AUTO_IMG = { taxi: 'autoTaxi' };
+// (la primera imagen del taxi se veía demasiado de costado: hace falta una con la cámara más alta)
+const AUTO_IMG = {};
 import { loadModel, renderOblique } from '../js/model3d.js';
 
 // Modelos 3D del dueño (assets/modelos/). up y front: cómo viene orientado cada archivo.
