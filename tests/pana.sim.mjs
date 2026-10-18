@@ -93,11 +93,11 @@ for (let seed = 1; seed <= 40; seed++) {
   const key = S.alive ? 'vivo' : S.crash.kind;
   deaths[key] = (deaths[key] || 0) + 1;
   if (!S.alive && S.maxRow < 20) earlyDeaths++;
-  scores.push(S.maxRow * 3);
+  scores.push(S.maxRow);
   inst.destroy();
 }
 scores.sort((a, b) => a - b);
 console.log((earlyDeaths > 4 ? 'FAIL ' : 'OK   ') + `el piloto cruza las 2 primeras Panamericanas en ${40 - earlyDeaths} de 40 partidas`);
 console.log('finales:', JSON.stringify(deaths));
-console.log('metros del piloto (mín / mediana / máx):', scores[0], scores[20], scores[39]);
+console.log('carriles del piloto (mín / mediana / máx):', scores[0], scores[20], scores[39]);
 process.exit(earlyDeaths > 4 ? 1 : 0);

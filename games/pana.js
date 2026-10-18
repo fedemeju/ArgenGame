@@ -42,20 +42,20 @@ export function riderTris(a) {
       tris.push({ v: [W([lx, b0, a0]), W([lx, b1, a1]), W([lx, b2, a2])], c: hub });
     }
   };
-  wheel(-0.26, 0.13); wheel(0.26, 0.13);
-  box(-0.018, 0.018, 0.17, 0.21, -0.26, 0.26, '#3a3f45');      // cuadro
-  box(-0.018, 0.018, 0.21, 0.36, -0.09, -0.05, '#3a3f45');     // caño del asiento
-  box(-0.04, 0.04, 0.36, 0.39, -0.14, -0.02, '#1b1d20');       // asiento
-  box(-0.018, 0.018, 0.21, 0.43, 0.2, 0.24, '#3a3f45');        // caño del manubrio
-  box(-0.14, 0.14, 0.43, 0.46, 0.19, 0.23, '#1b1d20');         // manubrio
-  for (const s of [-1, 1]) box(s * 0.03, s * 0.09, 0.14, 0.38, -0.04, 0.05, '#2f3b4a');            // piernas
-  box(-0.11, 0.11, 0.38, 0.66, -0.12, 0.05, '#34495e');        // campera
-  for (const s of [-1, 1]) box(s * 0.09, s * 0.14, 0.5, 0.57, -0.02, 0.22, '#34495e');             // brazos al manubrio
-  box(-0.135, 0.135, 0.42, 0.72, -0.32, -0.12, '#d62828');     // mochila de delivery
-  box(-0.135, 0.135, 0.72, 0.75, -0.32, -0.12, '#f6b40e');     // tapa amarilla
-  box(-0.07, 0.07, 0.66, 0.79, -0.05, 0.08, '#e0b48a');        // cabeza
-  box(-0.085, 0.085, 0.77, 0.86, -0.07, 0.1, '#f6b40e');       // casco
-  box(-0.015, 0.015, 0.86, 0.87, -0.07, 0.1, '#d62828');       // franja del casco
+  wheel(-0.27, 0.17); wheel(0.27, 0.17);
+  box(-0.018, 0.018, 0.21, 0.25, -0.26, 0.26, '#3a3f45');      // cuadro
+  box(-0.018, 0.018, 0.25, 0.40, -0.09, -0.05, '#3a3f45');     // caño del asiento
+  box(-0.04, 0.04, 0.40, 0.43, -0.14, -0.02, '#1b1d20');       // asiento
+  box(-0.018, 0.018, 0.25, 0.47, 0.2, 0.24, '#3a3f45');        // caño del manubrio
+  box(-0.14, 0.14, 0.47, 0.50, 0.19, 0.23, '#1b1d20');         // manubrio
+  for (const s of [-1, 1]) box(s * 0.03, s * 0.09, 0.18, 0.42, -0.04, 0.05, '#2f3b4a');            // piernas
+  box(-0.11, 0.11, 0.42, 0.70, -0.12, 0.05, '#34495e');        // campera
+  for (const s of [-1, 1]) box(s * 0.09, s * 0.14, 0.54, 0.61, -0.02, 0.22, '#34495e');             // brazos al manubrio
+  box(-0.135, 0.135, 0.46, 0.76, -0.32, -0.12, '#d62828');     // mochila de delivery
+  box(-0.135, 0.135, 0.76, 0.79, -0.32, -0.12, '#f6b40e');     // tapa amarilla
+  box(-0.07, 0.07, 0.70, 0.83, -0.05, 0.08, '#e0b48a');        // cabeza
+  box(-0.085, 0.085, 0.81, 0.90, -0.07, 0.1, '#f6b40e');       // casco
+  box(-0.015, 0.015, 0.90, 0.91, -0.07, 0.1, '#d62828');       // franja del casco
   return tris;
 }
 import { loadModel, renderOblique, renderWorld } from '../js/model3d.js';
@@ -73,7 +73,6 @@ const COLS = 9, VIEW_ROWS = 11, START_COL = 4;
 const TRACK = COLS + 10;                 // largo del recorrido de cada carril (5 casilleros fuera de pantalla a cada lado)
 const HOP_MS = 90, STUN_MS = 500;
 const SAFE_X = 0.2;                      // margen del ciclista dentro de su casillero (ocupa 0,6 de ancho)
-const M_PER_ROW = 3;                     // metros por casillero avanzado
 const TRAMO = 10;                        // filas por cruce de Panamericana (la última es vereda para respirar)
 
 // Un cruce, de abajo hacia arriba. speed: casilleros por segundo; gap: espacio libre entre vehículos.
@@ -154,13 +153,13 @@ export default {
   id: 'pana',
   name: 'Pana Express',
   tagline: 'Cruzá la Panamericana con el pedido',
-  threshold: 9,
+  threshold: 3,
   rules: [
     'Sos el delivery y cruzás la Panamericana con la bici y la mochila, casillero por casillero.',
     'Tocá la pantalla para avanzar. Deslizá a los costados para esquivar o para abajo para retroceder.',
     'Colectora con colectivos que arrancan y frenan, camiones con acoplado, carriles rápidos, el cantero para respirar y la mano contraria.',
     'Los pozos y la baldosa floja te frenan medio segundo. Las camionetas estacionadas y el perro no te dejan pasar.',
-    'Del otro lado viene otra Panamericana, con más tránsito y más rápido. Cada casillero que avanzás suma 3 metros.',
+    'Arranca tranquilo y del otro lado viene otra Panamericana, con más tránsito y más rápido. Cada carril que cruzás suma 1 punto.',
     'Tenés una sola vida: si te pisan, se terminó.',
   ],
   icon(c, s) {
@@ -191,12 +190,13 @@ export default {
       else if (r === 0) L = { type: 'vereda', first: true };
       else {
         const tramo = Math.floor((r - 1) / TRAMO), p = PATTERN[(r - 1) % TRAMO];
-        const hard = Math.min(tramo, 6);
+        const hard = Math.min(tramo, 8);
         L = { ...p, tramo, items: [], static: [], pozos: [] };
         if (p.type === 'road') {
-          // el primer cruce va a 0,85 de la velocidad base y cada cruce suma 0,1 (tope en el séptimo)
-          L.v = (p.speed[0] + rng() * (p.speed[1] - p.speed[0])) * (0.85 + 0.1 * hard);
-          const gk = Math.max(0.78, 1 - 0.04 * hard);
+          // De menos a más: el primer cruce va a 0,65 de la velocidad y con mucho más espacio entre vehículos;
+          // cada cruce suma 0,1 de velocidad y achica los huecos, hasta el noveno.
+          L.v = (p.speed[0] + rng() * (p.speed[1] - p.speed[0])) * (0.65 + 0.1 * hard);
+          const gk = Math.max(0.78, 1.5 - 0.09 * hard);
           L.phase = rng() * TRACK; L.period = 3 + rng() * 2; L.pp = rng() * 6;
           let u = 0;
           const lastGap = p.gap[0] * gk;
@@ -232,8 +232,8 @@ export default {
       crash: null, shake: 0, wobble: 0,
     };
     let endTimer = 0;
-    const score = () => S.maxRow * M_PER_ROW;
-    const report = () => onScore(score(), 'Metros');
+    const score = () => S.maxRow;                 // 1 punto por cada carril cruzado
+    const report = () => onScore(score(), 'Carriles');
 
     // Posición del borde izquierdo de cada vehículo en casilleros (puede estar fuera de la pantalla)
     function offset(L, t) {
@@ -278,7 +278,7 @@ export default {
       const L = lane(nr);
       if (nr > S.maxRow) {
         S.maxRow = nr;
-        if (L.type === 'vereda') { flash(toast, `¡Cruzaste! Km ${L.km}`); audio.win(); buzz([20, 40, 20]); }
+        if (L.type === 'vereda') { flash(toast, `¡Cruzaste la Panamericana ${Math.floor(nr / TRAMO)}!`); audio.win(); buzz([20, 40, 20]); }
       }
       if (L.pozos && L.pozos.includes(nc)) { S.stunT = STUN_MS; flash(toast, '¡Pozo!'); audio.tone(140, 0.15, 'sawtooth', 0.08); buzz(30); }
       if (L.type === 'cantero') {
@@ -339,7 +339,7 @@ export default {
       quad([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], opt.top || shade(col, 1.12));
     }
     function wheel(x, z) {
-      const [sx, sy] = P(x, 0.11, z), r = 0.11 * hS;
+      const [sx, sy] = P(x, 0.15, z), r = 0.15 * hS;          // ruedas grandes, estilo juguete
       ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.ellipse(sx, sy, r, r, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#8a9099'; ctx.beginPath(); ctx.ellipse(sx, sy, r * 0.42, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
     }
@@ -515,11 +515,39 @@ export default {
       const [lx, ly] = P(0.1, 0, r + 0.5);
       ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.font = `900 ${rowD * 0.24}px Chivo, system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(L.name || '', lx, ly);
-      for (const pc of L.pozos || []) {
-        const [sx, sy] = P(pc + 0.5, 0.003, r + 0.5);
-        ctx.fillStyle = '#2a2d31'; ctx.beginPath(); ctx.ellipse(sx, sy, cw * 0.34, rowD * 0.26, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(120,160,200,.35)'; ctx.beginPath(); ctx.ellipse(sx - cw * 0.06, sy - rowD * 0.03, cw * 0.18, rowD * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+      for (const pc of L.pozos || []) drawPozo(pc, r);
+    }
+
+    // Pozo: borde de asfalto roto, agujero con fondo oscuro y agua, y grietas que salen para los costados
+    function drawPozo(pc, r) {
+      const [sx, sy] = P(pc + 0.5, 0.003, r + 0.5), rx = cw * 0.34, ry = rowD * 0.24;
+      let seed = (r * 73856093) ^ (pc * 19349663);
+      const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      ctx.strokeStyle = '#25272b'; ctx.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * Math.PI * 2 + rnd() * 0.6;
+        let x = sx + Math.cos(a) * rx * 0.9, y = sy + Math.sin(a) * ry * 0.9;
+        ctx.lineWidth = Math.max(1.2, cw * 0.025); ctx.beginPath(); ctx.moveTo(x, y);
+        for (let k = 0; k < 3; k++) {
+          const aa = a + (rnd() - 0.5) * 0.9, step = (0.22 + rnd() * 0.2);
+          x += Math.cos(aa) * rx * step; y += Math.sin(aa) * ry * step;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
       }
+      const jag = (k, col) => {
+        ctx.fillStyle = col; ctx.beginPath();
+        for (let i = 0; i < 12; i++) {
+          const a = i / 12 * Math.PI * 2, f = k * (0.85 + ((i * 7 + pc * 3 + r) % 5) * 0.06);
+          const x = sx + Math.cos(a) * rx * f, y = sy + Math.sin(a) * ry * f;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.closePath(); ctx.fill();
+      };
+      jag(1.12, '#6a6f77');                    // borde roto, más claro
+      jag(0.95, '#1d1f22');                    // agujero
+      ctx.fillStyle = '#34373c'; ctx.beginPath(); ctx.ellipse(sx, sy + ry * 0.2, rx * 0.7, ry * 0.55, 0, 0, Math.PI * 2); ctx.fill();   // fondo
+      ctx.fillStyle = 'rgba(120,160,200,.4)'; ctx.beginPath(); ctx.ellipse(sx - rx * 0.12, sy + ry * 0.25, rx * 0.42, ry * 0.28, 0, 0, Math.PI * 2); ctx.fill();   // agua
     }
 
     // Objetos de la fila de izquierda a derecha; si el ciclista está en esta fila se dibuja en su lugar.
@@ -548,27 +576,7 @@ export default {
           objs.push({ x: dx, fn: () => dog3d(dx, r, now, goingBack ? -1 : 1) });
         }
       }
-      if (L.type === 'vereda' && !L.plain) {
-        if (L.first) {
-          objs.push({ x: 0, fn: () => {
-            for (const xx of [0.3, 1.9]) box(xx, xx + 0.06, 0.07, 1.05, r + 0.82, r + 0.88, '#6b7380');
-            box(0.2, 2.1, 1.05, 1.12, r + 0.55, r + 0.95, '#26323e', { top: '#3a4a5c' });
-            box(0.3, 1.95, 0.4, 0.95, r + 0.86, r + 0.9, '#9fc1de', { front: 'rgba(160,200,230,.45)' });
-            faceText('PARADA', 1.12, 1.0, r + 0.55, rowD * 0.14, '#f6b40e');
-          } });
-        } else {
-          objs.push({ x: 2, fn: () => {
-            for (const xx of [2.3, 6.6]) box(xx, xx + 0.08, 0.07, 0.75, r + 0.84, r + 0.9, '#3a3f45');
-            box(2, 7, 0.7, 1.25, r + 0.82, r + 0.92, '#26323e', { top: '#3a4a5c' });
-            faceText(L.lugar, 4.5, 0.97, r + 0.82, rowD * 0.22, '#f6b40e');
-          } });
-          objs.push({ x: 7.6, fn: () => {
-            box(7.65, 8.25, 0.07, 0.62, r + 0.5, r + 0.7, '#f2f2f2');
-            box(7.65, 8.25, 0.5, 0.62, r + 0.497, r + 0.7, '#1f7a4a');
-            faceText(String(L.km), 7.95, 0.3, r + 0.5, rowD * 0.2, '#26323e');
-          } });
-        }
-      }
+      // las veredas (zonas seguras) quedan limpias: sin carteles que tapen los carriles de atrás
       objs.sort((a, b) => a.x - b.x);
       if (drawPlayer) {
         // el ciclista se mete entre los objetos según su columna
