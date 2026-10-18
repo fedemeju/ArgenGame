@@ -512,9 +512,6 @@ export default {
       quad([[XL, 0, r], [XR, 0, r], [XR, 0, r + 1], [XL, 0, r + 1]], L.stopGo || L.type === 'colectora2' ? '#555a62' : '#4b5058');
       const next = PATTERN[L.row % TRAMO];
       if (L.type === 'road' && next && next.type === 'road' && next.dir === L.dir) for (let x = -4; x < COLS + 4; x += 1.3) quad([[x, 0.002, r + 0.985], [x + 0.6, 0.002, r + 0.985], [x + 0.6, 0.002, r + 1.015], [x, 0.002, r + 1.015]], 'rgba(255,255,255,.75)');
-      const [lx, ly] = P(0.1, 0, r + 0.5);
-      ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.font = `900 ${rowD * 0.24}px Chivo, system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(L.name || '', lx, ly);
       for (const pc of L.pozos || []) drawPozo(pc, r);
     }
 
