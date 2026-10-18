@@ -111,6 +111,8 @@ export default {
   mount(el, { seed, onScore, onEnd }) {
     const st = makeCanvas(el), ctx = st.ctx;
     const pill = overlay(el, 'g-pill', 'Tocá para avanzar · deslizá para esquivar');
+    // el cartel va arriba de todo: abajo taparía la largada y los primeros carriles
+    pill.style.bottom = 'auto'; pill.style.top = '10px'; pill.style.fontSize = '13px'; pill.style.opacity = '0.92';
     const toast = overlay(el, 'g-toast');
 
     // Las filas se arman cuando hacen falta, cada una con su azar fijo.
@@ -127,7 +129,8 @@ export default {
         const hard = Math.min(tramo, 6);
         L = { ...p, tramo, items: [], static: [], pozos: [] };
         if (p.type === 'road') {
-          L.v = (p.speed[0] + rng() * (p.speed[1] - p.speed[0])) * (1 + 0.12 * hard);
+          // el primer cruce va a 0,85 de la velocidad base y cada cruce suma 0,1 (tope en el séptimo)
+          L.v = (p.speed[0] + rng() * (p.speed[1] - p.speed[0])) * (0.85 + 0.1 * hard);
           const gk = Math.max(0.78, 1 - 0.04 * hard);
           L.phase = rng() * TRACK; L.period = 3 + rng() * 2; L.pp = rng() * 6;
           let u = 0;
@@ -382,7 +385,7 @@ export default {
       const W = st.w, H = st.h;
       cw = W / (COLS + 1.4);
       rowD = Math.min(cw * 1.25, H / 11);
-      hS = cw * 0.95;
+      hS = cw * 0.8;                 // alturas un poco aplastadas: lo alto tapa menos la fila de atrás
       baseY = H - rowD * 1.1;
       ox = cw * 0.3;
       ctx.save();
@@ -435,7 +438,12 @@ export default {
     // Objetos de la fila de izquierda a derecha; si el ciclista está en esta fila se dibuja en su lugar.
     function drawObjects(L, r, now, pz, px, drawPlayer) {
       const objs = [];
-      if (L.type === 'road') for (const { it, x } of itemsAt(L, S.t)) if (x < COLS + 2 && x + it.len > -3) objs.push({ x, fn: () => vehicle3d(it, x, r) });
+      if (L.type === 'road') for (const { it, x } of itemsAt(L, S.t)) if (x < COLS + 2 && x + it.len > -3) {
+        // un colectivo o camión que pasa justo delante del ciclista se ve medio transparente, para no taparlo
+        const tall = it.kind === 'colectivo' || it.kind === 'camion';
+        const ghost = tall && S.alive && r === S.row - 1 && x < S.col + 1.2 && x + it.len > S.col - 0.2;
+        objs.push({ x, fn: () => { if (ghost) ctx.globalAlpha = 0.5; vehicle3d(it, x, r); ctx.globalAlpha = 1; } });
+      }
       if (L.type === 'colectora2') for (const sv of L.static) objs.push({ x: sv.col, fn: () => vehicle3d({ kind: 'camioneta', dir: 1, color: sv.color, len: 0.92 }, sv.col + 0.04, r) });
       if (L.type === 'cantero') {
         objs.push({ x: -10, fn: () => { for (const zz of [r + 0.06, r + 0.94]) { box(-6, COLS + 6, 0.24, 0.32, zz - 0.02, zz + 0.02, '#b8bfc7'); for (let x = -4.75; x < COLS + 4; x += 1) box(x, x + 0.06, 0.1, 0.32, zz - 0.03, zz + 0.03, '#7d858e'); } } });
