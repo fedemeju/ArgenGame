@@ -36,6 +36,6 @@ Desafío diario de minijuegos argentos entre amigos, web para celular (después 
 
 ## Pendientes
 
-- Modelos 3D de autos y camiones argentinos (el dueño los hace con IA en otro lado con prompts que le pasamos) para usar en el Fitito y en Pana Express.
+- Modelos 3D de autos y camiones argentinos (el dueño los hace con IA en otro lado con prompts que le pasamos) para usar en el Fitito y en Pana Express. Ya está el lector: `js/model3d.js` lee GLB sin librerías (colores por vértice, material o textura) y `renderOblique()` lo dibuja una vez con la cámara de Pana Express como imagen; en `games/pana.js` se registran en `MODELS` (`src`, `up`, `front`) y los vehículos sin modelo siguen con cajas. Para revisar uno: `tools/ver-modelo.html?src=...&up=y&front=+x`. El primer GLB del dueño (taxi hecho con trimesh) se descartó porque se veía mal.
 
 - Más juegos, con las ideas del dueño.

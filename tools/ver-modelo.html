@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<!-- Muestra un modelo 3D (GLB) en grande con la cámara de Pana Express, para los dos sentidos.
+     ?src=assets/modelos/taxi.glb&up=z&front=+x&len=1.15   (len: largo en casilleros) -->
+<style>
+  body { margin: 0; background: #4b5058; font: 14px system-ui, sans-serif; color: #eee; }
+  .fila { display: flex; gap: 24px; padding: 16px; align-items: flex-end; flex-wrap: wrap; }
+  figure { margin: 0; text-align: center; }
+  canvas { background: #555a62; border-radius: 8px; }
+</style>
+<div class="fila" id="out"></div>
+<script type="module">
+import { loadModel, renderOblique } from './js/model3d.js';
+const q = new URLSearchParams(location.search);
+const model = await loadModel(q.get('src') || 'assets/modelos/taxi.glb', { up: q.get('up') || 'z', front: q.get('front') || '+x' });
+const out = document.getElementById('out');
+if (!model) out.textContent = 'No se pudo cargar el modelo';
+else {
+  const len = Number(q.get('len') || 1.15), cw = Number(q.get('cw') || 160);
+  for (const dir of [1, -1]) {
+    const s = renderOblique(model, { len, dir, cw, rowD: cw * 1.25, hS: cw * 0.8, skew: 0.3, dpr: 1 });
+    const fig = document.createElement('figure');
+    fig.appendChild(s.img);
+    fig.insertAdjacentHTML('beforeend', `<figcaption>${dir > 0 ? 'va a la derecha' : 'va a la izquierda'} · ${model.tris.length} triángulos · ${model.len.toFixed(2)} × ${model.wid.toFixed(2)} × ${model.hgt.toFixed(2)}</figcaption>`);
+    out.appendChild(fig);
+  }
+}
+</script>

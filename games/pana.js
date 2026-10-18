@@ -1,4 +1,11 @@
 import { makeCanvas, startLoop, bindInput, mulberry32, hashSeed, audio, buzz, overlay, flash, rrect, circle } from '../js/engine.js';
+import { assetUrl } from '../js/art.js';
+import { loadModel, renderOblique } from '../js/model3d.js';
+
+// Modelos 3D del dueño (assets/modelos/). up y front: cómo viene orientado cada archivo.
+// Los que no tienen modelo se dibujan con cajas en código.
+// Ejemplo: taxi: { src: 'assets/modelos/taxi.glb', up: 'y', front: '+x' }
+const MODELS = {};
 
 // Pana Express: el frogger del delivery. Cruzás la Panamericana en bici, casillero por casillero,
 // y del otro lado viene otra, y otra: la ruta no termina. Puntos = metros recorridos, una sola vida.
@@ -286,8 +293,28 @@ export default {
     }
     const GLASS = '#2b3a4a';
 
+    // Imágenes de los modelos 3D, una por vehículo, sentido y tamaño de pantalla
+    const models = {}, sprites = new Map();
+    for (const [kind, m] of Object.entries(MODELS)) {
+      loadModel(assetUrl(m.src), m).then(model => { if (model) { models[kind] = model; sprites.clear(); } });
+    }
+    function modelSprite(kind, dir, len) {
+      const model = models[kind];
+      if (!model) return null;
+      const key = `${kind}|${dir}|${len}|${cw.toFixed(1)}|${rowD.toFixed(1)}|${hS.toFixed(1)}|${st.dpr}`;
+      if (!sprites.has(key)) sprites.set(key, renderOblique(model, { len, dir, cw, rowD, hS, skew: SKEW, dpr: st.dpr }));
+      return sprites.get(key);
+    }
+
     function vehicle3d(v, x, r) {
       const len = v.len, d = v.dir, z0 = r + 0.17, z1 = r + 0.83;
+      const spr = modelSprite(v.kind, d, len);
+      if (spr) {
+        shadow(x, x + len, z0, z1);
+        const [ax, ay] = P(x, 0, r + 0.5);
+        ctx.drawImage(spr.img, ax + spr.dx, ay + spr.dy, spr.w, spr.h);
+        return;
+      }
       const at = f => (d > 0 ? x + len * f : x + len * (1 - f));            // f: 0 cola, 1 trompa
       const span = (a, b) => [Math.min(at(a), at(b)), Math.max(at(a), at(b))];
       shadow(x, x + len, z0, z1);

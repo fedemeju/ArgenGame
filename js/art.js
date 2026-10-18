@@ -68,6 +68,8 @@ const custom = {};
 // Las imágenes llevan la misma versión que los módulos (la pone tools/version.mjs en el import map de index.html),
 // así el celular no mezcla una imagen vieja del caché con código nuevo.
 const VERSION = new URL(import.meta.url).searchParams.get('v');
+// Ruta de un archivo de assets/ con la versión puesta (para modelos 3D y otros que no pasan por FILES).
+export const assetUrl = src => (VERSION ? `${src}?v=${VERSION}` : src);
 
 export function loadCustomArt(onLoad) {
   for (const [k, src] of Object.entries(FILES)) {
