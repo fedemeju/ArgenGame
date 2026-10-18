@@ -28,18 +28,36 @@ for (let seed = 1; seed <= 40; seed++) {
   while (S.alive && t < 120000) {
     inst._update(16); t += 16;
     const pz = S.pos + PZ;
-    // tapados: lo que está pasando por el auto en este momento (autos, pozos quietos y la barrera del peaje)
-    const here = [...S.obstacles, ...inst._tolls.map(tl => ({ z: tl.z, lane: tl.lane, v: 0 }))].filter(o => Math.abs(o.z - pz) < SEG * 1.5);
-    if (new Set(here.map(o => o.lane)).size >= 3) blocked++;
-    // piloto: va al carril cuyo próximo obstáculo llega más tarde, de a un toque (la barrera del peaje cuenta)
-    const all = [...S.obstacles, ...inst._tolls.map(tl => ({ z: tl.z, lane: tl.lane, v: 0 }))];
-    const arr = o => (o.z - pz) / Math.max(1, S.speed + (o.v || 0));
-    const first = l => Math.min(9, ...all.filter(o => o.lane === l && arr(o) > -0.08).map(arr));
-    const f = [0, 1, 2].map(first);
-    const target = [0, 1, 2].reduce((b, l) => (f[l] > f[b] + 0.05 || (Math.abs(f[l] - f[b]) <= 0.05 && Math.abs(l - S.lane) < Math.abs(b - S.lane))) ? l : b, S.lane);
-    if (target !== S.lane && f[S.lane] < 1.3 && t - lastMove > 140) {
-      const step = Math.sign(target - S.lane);
-      if (f[S.lane + step] > 0.2) { inst._move(step); lastMove = t; }
+    // Todo lo que ocupa la ruta con su largo (autos, camiones, pozos y la barrera del peaje), igual que el juego.
+    const M = 2000 / 5.5, CAR_LEN = 3.3 * M;
+    const all = [...S.obstacles.map(o => ({ o, l: inst._span(o), v: o.v || 0 })), ...inst._tolls.map(tl => ({ o: { z: tl.z, lane: tl.lane }, l: [-0.4 * M, 0], v: 0 }))];
+    // tapados: carriles ocupados ahora mismo en la zona del Fitito
+    if (new Set(all.filter(({ o, l }) => o.z + l[0] < pz + CAR_LEN && o.z + l[1] > pz).map(({ o }) => o.lane)).size >= 3) blocked++;
+    // cuándo empieza y termina a ocupar la zona del Fitito cada cosa
+    const win = ({ o, l, v }) => { const rel = Math.max(1, S.speed + v); return [(o.z + l[0] - pz - CAR_LEN) / rel, (o.z + l[1] - pz) / rel]; };
+    const busyAt = (lane, t0, t1) => all.some(a => a.o.lane === lane && (([a0, a1]) => a0 < t1 && a1 > t0)(win(a)));
+    // Piloto que planifica: busca, en pasos de 50 ms y hasta 2,5 s, una secuencia de quedarse o cambiar de carril
+    // (un cambio tarda unos 0,15 s y mientras tanto ocupa los dos carriles) que no se cruce con nada.
+    // Si este piloto choca, hubo una situación imposible.
+    if (S.x === -1 + (2 * S.lane + 1) / 3 && t - lastMove > 60) {
+      const DT = 0.05, H = 50, prev = new Map([[`${S.lane},0`, null]]), q = [[S.lane, 0]];
+      let goal = null;
+      while (q.length && !goal) {
+        const [ln, k] = q.shift();
+        if (k >= H) { goal = [ln, k]; break; }
+        for (const d of [0, -1, 1]) {
+          const nl = ln + d, nk = k + (d ? 3 : 1);
+          if (nl < 0 || nl > 2 || prev.has(`${nl},${nk}`)) continue;
+          const t0 = k * DT - 0.02, t1 = nk * DT + 0.02;
+          if (busyAt(ln, t0, t1) || (d && busyAt(nl, t0, t1))) continue;
+          prev.set(`${nl},${nk}`, [ln, k, d]); q.push([nl, nk]);
+        }
+      }
+      if (goal) {
+        let cur = `${goal[0]},${goal[1]}`, first = 0;
+        while (prev.get(cur)) { const [pl, pk, d] = prev.get(cur); first = d; cur = `${pl},${pk}`; }
+        if (first) { inst._move(first); lastMove = t; }
+      }
     }
   }
   totalBlocked += blocked;

@@ -114,7 +114,7 @@ export default {
 
     const S = {
       pos: 0, speed: 0, lane: 1, x: 0, started: false, alive: true,
-      obstacles: [], nextObs: SEG * 50, shake: 0, crash: null, cuadras: 0, smoke: [], smokeT: 0, sinceBache: 5,
+      obstacles: [], nextObs: SEG * 50, shake: 0, crash: null, cuadras: 0, smoke: [], smokeT: 0, sinceBache: 5, laneLast: [0, 0, 0],
     };
     let endTimer = 0;
     const PLAYER_Z = CAM_H * DEPTH;
@@ -129,8 +129,19 @@ export default {
     // otra fila (de pozos o de autos) que venga pegada.
     // Los pozos están quietos sobre la ruta y los autos vienen de frente: se compara cuándo llega cada cosa
     // al Fitito (con la velocidad actual) en vez de dónde está. Así tampoco se tapan los 3 carriles.
-    const GAP_T = 0.9;                       // segundos: lo que llega más junto que esto cuenta como una sola fila
+    // Segundos: lo que llega más junto que esto cuenta como una sola fila. Tiene que ser corto (el tiempo de
+    // cambiar de carril y reaccionar): las filas salen cada medio segundo, y con 0,9 casi todas quedaban "juntas"
+    // y el carril del medio se quedaba sin autos por kilómetros.
+    const GAP_T = 0.4;
     const arrival = (oz, ov) => (oz - (S.pos + PLAYER_Z)) / Math.max(1, S.speed + ov);
+    // Largo que ocupa cada cosa sobre la ruta (desde su frente) y el Fitito (de pz a pz + 3,3 m).
+    const span = o => (o.kind === 'camion' ? [0, 14 * M] : o.kind === 'bache' ? [-0.8 * M, 3.4 * M] : [0, 4.3 * M]);
+    const CAR_LEN = 3.3 * M;
+    // Cuándo empieza y termina a ocupar la zona del Fitito algo que está en oz, con largo l y velocidad ov.
+    const window = (oz, l, ov) => {
+      const pz = S.pos + PLAYER_Z, rel = Math.max(1, S.speed + ov);
+      return [(oz + l[0] - pz - CAR_LEN) / rel, (oz + l[1] - pz) / rel];
+    };
     function spawnRow() {
       const level = Math.min(1, S.cuadras / 50);
       const z = S.pos + PLAYER_Z + SEG * DRAW * 0.95;
@@ -138,23 +149,33 @@ export default {
       // pozos: de a uno y cada tanto (nunca dos filas de pozos seguidas)
       const baches = S.sinceBache >= 5 && rng() < 0.35;
       const v = baches ? 0 : CAR_V;
-      const t = arrival(z, v);
-      // cerca del peaje no viene tráfico: solo la barrera del carril cerrado
-      if (tolls.some(tl => tl.z > S.pos && Math.abs(arrival(tl.z, 0) - t) < 1.4)) { S.nextObs = SEG * 4; return; }
-      const near = new Set(S.obstacles.filter(o => Math.abs(arrival(o.z, o.v) - t) < GAP_T).map(o => o.lane));
       const want = baches ? 1 : rng() < 0.4 + level * 0.3 ? 2 : 1;
+      const trucks = [rng() < 0.18, rng() < 0.18];
+      const myLen = baches ? span({ kind: 'bache' }) : span({ kind: trucks.slice(0, want).some(Boolean) ? 'camion' : 'auto' });
+      const [w0, w1] = window(z, myLen, v);
+      // cerca del peaje no viene tráfico: solo la barrera del carril cerrado
+      if (tolls.some(tl => tl.z > S.pos && Math.abs(window(tl.z, [-0.4 * M, 0], 0)[0] - w0) < 1.4)) { S.nextObs = SEG * 4; return; }
+      // Ocupan la zona del Fitito al mismo tiempo (con margen para cambiar de carril): entre todos no pueden tapar los 3.
+      const near = new Set(S.obstacles.filter(o => { const [a0, a1] = window(o.z, span(o), o.v); return a0 < w1 + GAP_T && w0 < a1 + GAP_T; }).map(o => o.lane));
+      // Si ya hay dos carriles ocupados, esta fila espera a que pase la anterior: si no, cada fila nueva repite
+      // esos dos carriles y el tercero queda libre por kilómetros (pasaba a máxima velocidad).
+      if (near.size >= 2) { S.nextObs = SEG * 3; return; }
       if (baches) S.sinceBache = 0;
       const combos = want === 2 ? [[0, 1], [1, 2], [0, 2]] : [[0], [1], [2]];
       for (let i = combos.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [combos[i], combos[j]] = [combos[j], combos[i]]; }
-      let lanes = combos.find(c => new Set([...near, ...c]).size <= 2);
-      if (!lanes) lanes = [0, 1, 2].filter(l => near.has(l)).slice(0, 1);
-      for (const lane of lanes) {
+      const valid = combos.filter(c => new Set([...near, ...c]).size <= 2);
+      // se prefiere el carril que hace más que no recibe nada, así ninguno queda vacío mucho tiempo
+      const starved = [0, 1, 2].reduce((a, b) => (S.laneLast[b] < S.laneLast[a] ? b : a), 0);
+      const lanes = (rng() < 0.6 && valid.find(c => c.includes(starved))) || valid[0];
+      if (!lanes) { S.nextObs = SEG * 3; return; }
+      for (const l of lanes) S.laneLast[l] = S.pos;
+      lanes.forEach((lane, k) => {
         if (baches) S.obstacles.push({ kind: 'bache', lane, z, x: laneX(lane) + (rng() - 0.5) * 0.12, w: 0.5, v: 0, variant: (lane + S.cuadras) % 3 });
         else {
-          const truck = rng() < 0.18;
+          const truck = trucks[k];
           S.obstacles.push({ kind: truck ? 'camion' : 'auto', lane, z, x: laneX(lane), w: truck ? 0.5 : 0.36, v, model: Math.floor(rng() * CARS.length) });
         }
-      }
+      });
       S.nextObs = SEG * (20 - level * 8) * (0.8 + rng() * 0.4);
     }
 
@@ -171,7 +192,6 @@ export default {
       S.smoke.forEach(p => { p.t += sec; p.y += 0.4 * M * sec; p.x += p.vx * sec; p.dz -= 0.8 * M * sec; });
       S.smoke = S.smoke.filter(p => p.t < 0.5);
       if (!S.started || !S.alive) return;
-      const prevPz = S.pos + PLAYER_Z;
       const top = MAX_SPEED * Math.min(1, 0.5 + S.cuadras * 0.008);
       S.speed = Math.min(top, S.speed + MAX_SPEED * 0.35 * sec);
       S.pos += S.speed * sec;
@@ -193,11 +213,11 @@ export default {
       if (S.nextObs <= 0) spawnRow();
       const pz = S.pos + PLAYER_Z;
       for (const o of S.obstacles) {
-        const before = o.z - prevPz;
         if (o.v) o.z -= o.v * sec;
-        const after = o.z - pz;
-        // choca si en este cuadro el obstáculo pasó por la franja del auto (aunque haya avanzado mucho)
-        if (before > -SEG * 0.5 && after < SEG * 0.5 && Math.abs(o.x - S.x) < (o.w + CAR_W) / 2 * 0.78) return die(o.kind);
+        // Choca mientras los dos se superponen en todo su largo (no solo en una franja en la trompa): si ya estás
+        // encima de otro auto, correrte a último momento no te salva. El Fitito ocupa de pz a pz + 3,3 m.
+        const [l0, l1] = span(o);
+        if (o.z + l0 < pz + 3.3 * M && o.z + l1 > pz && Math.abs(o.x - S.x) < (o.w + CAR_W) / 2 * 0.85) return die(o.kind);
       }
       S.obstacles = S.obstacles.filter(o => o.z > S.pos - SEG * 2);
       // peaje: aviso de qué carril está cerrado y choque contra la barrera
@@ -207,7 +227,7 @@ export default {
           flash(toast, `Peaje: el carril ${['izquierdo', 'del medio', 'derecho'][tl.lane]} es MANUAL, ¡barrera baja!`);
           audio.tone(660, 0.12, 'square', 0.08); audio.tone(660, 0.12, 'square', 0.08, 0.2);
         }
-        if (tl.z - prevPz > -SEG * 0.5 && tl.z - pz < SEG * 0.5 && Math.abs(laneX(tl.lane) - S.x) < (2 / 3 * 0.92 + CAR_W) / 2 * 0.8) return die('peaje');
+        if (tl.z - 0.4 * M < pz + 3.3 * M && tl.z > pz && Math.abs(laneX(tl.lane) - S.x) < (2 / 3 * 0.92 + CAR_W) / 2 * 0.8) return die('peaje');
       }
     }
 
@@ -725,7 +745,7 @@ export default {
 
     return {
       destroy() { stop(); unbind(); clearTimeout(endTimer); st.destroy(); pill.remove(); toast.remove(); },
-      _state: S, _update: update, _move: move, _draw: draw, _tolls: tolls,
+      _state: S, _update: update, _move: move, _draw: draw, _tolls: tolls, _span: span,
     };
   },
 };
