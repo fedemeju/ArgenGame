@@ -1,5 +1,9 @@
 import { makeCanvas, startLoop, bindInput, mulberry32, hashSeed, audio, buzz, overlay, flash, rrect, circle } from '../js/engine.js';
-import { assetUrl } from '../js/art.js';
+import { assetUrl, getCustom } from '../js/art.js';
+
+// Imágenes de vehículos del dueño (de costado, vistos desde arriba, mirando a la derecha). Los de la mano
+// contraria se espejan. Los que no tienen imagen se dibujan con cajas en código.
+const AUTO_IMG = { taxi: 'autoTaxi' };
 import { loadModel, renderOblique } from '../js/model3d.js';
 
 // Modelos 3D del dueño (assets/modelos/). up y front: cómo viene orientado cada archivo.
@@ -308,6 +312,21 @@ export default {
 
     function vehicle3d(v, x, r) {
       const len = v.len, d = v.dir, z0 = r + 0.17, z1 = r + 0.83;
+      const img = AUTO_IMG[v.kind] && getCustom(AUTO_IMG[v.kind]);
+      if (img) {
+        // La imagen viene de una cámara un poco más baja que la del juego: se agranda apenas y se estira de alto
+        // para que llene el carril como los demás. Las ruedas apoyan en el borde cercano del vehículo.
+        const w = len * cw * 1.14, h = w * img.height / img.width * 1.35;
+        const [bx, by] = P(x, 0, z0 + 0.02);
+        const cx = bx + len * cw / 2;
+        ctx.fillStyle = 'rgba(0,0,0,.28)';
+        ctx.beginPath(); ctx.ellipse(cx + cw * 0.06, by - h * 0.08, w * 0.5, h * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.save();
+        if (d < 0) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
+        ctx.drawImage(img, cx - w / 2, by - h, w, h);
+        ctx.restore();
+        return;
+      }
       const spr = modelSprite(v.kind, d, len);
       if (spr) {
         shadow(x, x + len, z0, z1);
