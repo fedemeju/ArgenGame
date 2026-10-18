@@ -32,6 +32,11 @@ if (steps) {
         else inst._press('duck', tc < (S.y > 0 ? 0.6 : 0.3));
       }
     }
+    // &piloto=1 en el tero: aletea apuntando al centro del hueco, como en tests/tero.sim.mjs
+    if (q.get('piloto') && inst._flap) {
+      const next = S.pipes.find(p => p.x + inst._phys.PW + inst._phys.R > S.x);
+      if (next && S.y > (next.top + next.bot) / 2 + 0.025 && S.vy > -0.15) inst._flap();
+    }
     inst._update(16);
   }
   inst._state.started = false;

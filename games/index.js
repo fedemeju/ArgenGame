@@ -4,8 +4,9 @@
 import viborita from './viborita.js';
 import fitito from './fitito.js';
 import carpincho from './carpincho.js';
+import tero from './tero.js';
 
-const LIST = [viborita, fitito, carpincho];
+const LIST = [viborita, fitito, carpincho, tero];
 
 export const GAMES = Object.fromEntries(LIST.map(g => [g.id, g]));
 export const GAME_IDS = LIST.map(g => g.id);
