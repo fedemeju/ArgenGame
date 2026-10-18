@@ -115,21 +115,45 @@ export function renderOblique(model, { len, dir, cw, rowD, hS, skew, dpr = 1 }) 
     const n0 = norm(cross(sub(w[1], w[0]), sub(w[2], w[0])));
     const n = dot(n0, dview) > 0 ? n0.map(v => -v) : n0;   // la cara que mira a la cámara
     const k = 0.58 + 0.42 * Math.max(0, dot(n, L));
-    const depth = (w[0][0] + w[1][0] + w[2][0]) / 3 * dview[0] + (w[0][1] + w[1][1] + w[2][1]) / 3 * dview[1] + (w[0][2] + w[1][2] + w[2][2]) / 3 * dview[2];
-    return { p: w.map(q => proj(...q)), depth, fill: `rgb(${t.c.map(v => Math.round(Math.min(255, v * k))).join(',')})` };
+    return { p: w.map(q => proj(...q)), z: w.map(q => dot(q, dview)), rgb: t.c.map(v => Math.round(Math.min(255, v * k))) };
   });
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const it of items) for (const [x, y] of it.p) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   x0 -= 2; y0 -= 2; x1 += 2; y1 += 2;
-  const c = document.createElement('canvas');
-  c.width = Math.max(1, Math.ceil((x1 - x0) * dpr)); c.height = Math.max(1, Math.ceil((y1 - y0) * dpr));
-  const g = c.getContext('2d');
-  g.scale(dpr, dpr); g.translate(-x0, -y0); g.lineJoin = 'round'; g.lineWidth = 0.7;
-  items.sort((a, b) => b.depth - a.depth);                 // de lo más lejano a lo más cercano
+
+  // Se pinta píxel por píxel guardando la profundidad de cada uno (z-buffer): así una pieza finita pegada a otra
+  // (un vidrio, una franja) nunca queda tapada por error. Se dibuja al doble y se achica para suavizar los bordes.
+  const SS = dpr >= 2 ? 1 : 2, k = dpr * SS;            // en pantallas densas ya alcanza sin dibujar al doble
+  const W = Math.max(1, Math.ceil((x1 - x0) * k)), H = Math.max(1, Math.ceil((y1 - y0) * k));
+  const zbuf = new Float32Array(W * H).fill(Infinity), px = new Uint8ClampedArray(W * H * 4);
   for (const it of items) {
-    g.fillStyle = g.strokeStyle = it.fill;
-    g.beginPath(); g.moveTo(...it.p[0]); g.lineTo(...it.p[1]); g.lineTo(...it.p[2]); g.closePath(); g.fill(); g.stroke();
+    const P3 = it.p.map(([x, y]) => [(x - x0) * k, (y - y0) * k]), Z = it.z;
+    const area = (P3[1][0] - P3[0][0]) * (P3[2][1] - P3[0][1]) - (P3[2][0] - P3[0][0]) * (P3[1][1] - P3[0][1]);
+    if (Math.abs(area) < 1e-6) continue;
+    const minX = Math.max(0, Math.floor(Math.min(P3[0][0], P3[1][0], P3[2][0]))), maxX = Math.min(W - 1, Math.ceil(Math.max(P3[0][0], P3[1][0], P3[2][0])));
+    const minY = Math.max(0, Math.floor(Math.min(P3[0][1], P3[1][1], P3[2][1]))), maxY = Math.min(H - 1, Math.ceil(Math.max(P3[0][1], P3[1][1], P3[2][1])));
+    const [r, g, b] = it.rgb;
+    for (let y = minY; y <= maxY; y++) {
+      const sy = y + 0.5;
+      for (let x = minX; x <= maxX; x++) {
+        const sx = x + 0.5;
+        const w0 = ((P3[1][0] - sx) * (P3[2][1] - sy) - (P3[2][0] - sx) * (P3[1][1] - sy)) / area;
+        const w1 = ((P3[2][0] - sx) * (P3[0][1] - sy) - (P3[0][0] - sx) * (P3[2][1] - sy)) / area;
+        const w2 = 1 - w0 - w1;
+        if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
+        const z = w0 * Z[0] + w1 * Z[1] + w2 * Z[2], i = y * W + x;
+        if (z >= zbuf[i]) continue;
+        zbuf[i] = z; px[i * 4] = r; px[i * 4 + 1] = g; px[i * 4 + 2] = b; px[i * 4 + 3] = 255;
+      }
+    }
   }
+  const big = document.createElement('canvas'); big.width = W; big.height = H;
+  big.getContext('2d').putImageData(new ImageData(px, W, H), 0, 0);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil(W / SS)); c.height = Math.max(1, Math.ceil(H / SS));
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(big, 0, 0, c.width, c.height);
   return { img: c, dx: x0, dy: y0, w: x1 - x0, h: y1 - y0, hgt: model.hgt * s };
 }
 
