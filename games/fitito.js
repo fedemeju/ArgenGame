@@ -139,25 +139,39 @@ export default {
       const level = Math.min(1, S.cuadras / 50);
       const reserved = S.pending.shift() || new Set();   // carriles que ocupa un camión que viene del tramo anterior
       const blocked = new Set(reserved);
-      // ¿se corre el carril salvador? cada tanto al azar, y sí o sí si hace 3 cuadras que es el mismo
-      // (si no, ese carril se quedaba sin tráfico). No se corre a un carril que todavía tiene un camión.
-      if (!S.shift && (rng() < 0.12 || S.pos - S.safeSince > 3 * CUADRA)) {
-        const opts = [S.safe - 1, S.safe + 1].filter(l => l >= 0 && l < LANES && !blocked.has(l) && !S.pending.some(p => p.has(l)));
-        if (opts.length) S.shift = { to: opts[Math.floor(rng() * opts.length)], left: 2 };
+      // ¿se corre el carril salvador? Poco al azar y sí o sí a las 2,5 cuadras. Si se corre muy seguido es peor:
+      // todos los cambios pasan por el carril del medio (no se salta del 0 al 2) y en cada cambio quedan libres
+      // los dos carriles, así que el del medio se quedaba sin tráfico hasta 16 cuadras y era muy fácil.
+      // No se corre a un carril que todavía tiene un camión. En el medio dura menos: desde un costado solo se puede
+      // ir al medio, así que el del medio es salvador la mitad de las veces.
+      // Al azar solo después de 1 cuadra en el mismo carril: si no, a veces llegaba a un costado y volvía enseguida
+      // al medio, y el del medio se quedaba vacío casi 10 cuadras.
+      // cerca de un peaje no sale tráfico nuevo (la barrera del carril MANUAL ya es el obstáculo), y ahí el salvador
+      // tampoco se corre: no hace falta, y si se corría después volvía a un carril que ya estaba vacío hacía rato.
+      const nearToll = tolls.some(tl => tl.z > S.pos && Math.abs(arrival(tl.z, 0) - arrival(z, CAR_V)) < 0.8);
+      const since = S.pos - S.safeSince;
+      if (!S.shift && !nearToll && ((rng() < 0.04 && since > CUADRA) || since > (S.safe === 1 ? 1.5 : 2.5) * CUADRA)) {
+        // si puede elegir, va al carril que recibió tráfico hace menos (nunca a uno que ya está abandonado)
+        const opts = [S.safe - 1, S.safe + 1].filter(l => l >= 0 && l < LANES && !blocked.has(l) && !S.pending.some(p => p.has(l)))
+          .sort((a, b) => S.laneLast[b] - S.laneLast[a]);
+        if (opts.length) S.shift = { to: opts[0], left: 2 };
       }
       const keep = new Set([S.safe]);
       if (S.shift) keep.add(S.shift.to);
       keep.forEach(l => blocked.add(l));
-      // cerca de un peaje no sale tráfico nuevo (la barrera del carril MANUAL ya es el obstáculo)
-      const nearToll = tolls.some(tl => tl.z > S.pos && Math.abs(arrival(tl.z, 0) - arrival(z, CAR_V)) < 1.3);
       // cuántos vehículos en este tramo: al principio más tramos vacíos, después más de a dos
       const r = rng();
-      const n = nearToll ? 0 : r < 0.55 - 0.25 * level ? 0 : r < 0.9 - 0.2 * level ? 1 : 2;
-      // carriles: primero el que hace más que no recibe nada, después al azar
+      let n = nearToll ? 0 : r < 0.55 - 0.25 * level ? 0 : r < 0.9 - 0.2 * level ? 1 : 2;
+      // un carril que hace más de 1,2 cuadras que no recibe nada (y no está reservado) recibe sí o sí:
+      // así, cuando el salvador se va de tu carril, enseguida aparece algo y hay que moverse
+      const hungry = [0, 1, 2].filter(l => !blocked.has(l) && S.pos - S.laneLast[l] > 1.2 * CUADRA).sort((a, b) => S.laneLast[a] - S.laneLast[b]);
+      if (!nearToll && hungry.length) n = Math.max(n, Math.min(2, hungry.length));
+      // carriles: primero los que hace más que no reciben nada, después al azar
       const order = [0, 1, 2];
       for (let i = 2; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
       const starved = [0, 1, 2].reduce((a, b) => (S.laneLast[b] < S.laneLast[a] ? b : a), 0);
       if (rng() < 0.7) { order.splice(order.indexOf(starved), 1); order.unshift(starved); }
+      for (const l of [...hungry].reverse()) { order.splice(order.indexOf(l), 1); order.unshift(l); }
       let placed = 0;
       for (const lane of order) {
         if (placed >= n || blocked.has(lane)) continue;
