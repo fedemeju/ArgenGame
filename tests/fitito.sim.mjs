@@ -36,7 +36,7 @@ for (let seed = 1; seed <= 40; seed++) {
     inst._update(DT);
     if (!S.alive) { S.alive = true; S.crash = null; }   // el auto no choca: solo se graba el tráfico
     const pz = S.pos + PZ;
-    const all = [...S.obstacles.map(o => [o, inst._span(o)]), ...inst._tolls.map(tl => [{ z: tl.z, lane: tl.lane }, [-0.4 * M, 0]])];
+    const all = [...S.obstacles.map(o => [o, inst._span(o)]), ...inst._tolls.flatMap(tl => tl.closed.map(lane => [{ z: tl.z, lane }, [-0.4 * M, 0]]))];
     const b = [false, false, false];
     for (const [o, l] of all) if (o.z + l[0] < pz + CAR_LEN && o.z + l[1] > pz) b[o.lane] = true;
     busy.push(b);

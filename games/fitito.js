@@ -109,7 +109,11 @@ export default {
       const rutas = [...new Set(['9', ...ahead.map(o => (o.ruta.match(/[0-9]+/) || [])[0]).filter(Boolean)])].sort((a, b) => a - b).slice(0, 3);
       addKm(s.km - 0.4, { t: 'portico', lugares: ahead.map(o => o.corto), rutas });
     }
-    const tolls = PEAJES.filter(km => km > START_KM).map(km => ({ km, z: segOfKm(km) * SEG, lane: Math.floor(srng() * LANES), warned: false }));
+    // El primer peaje tiene un carril cerrado (MANUAL); desde el segundo, dos: pasa uno solo (pedido del dueño).
+    const tolls = PEAJES.filter(km => km > START_KM).map((km, i) => {
+      const l = Math.floor(srng() * LANES);
+      return { km, z: segOfKm(km) * SEG, closed: i === 0 ? [l] : [0, 1, 2].filter(x => x !== l), warned: false };
+    });
     for (const tl of tolls) kmItems.set(segOfKm(tl.km), [...(kmItems.get(segOfKm(tl.km)) || []), { t: 'peaje', toll: tl }]);
 
     const S = {
@@ -209,7 +213,10 @@ export default {
       S.smoke.forEach(p => { p.t += sec; p.y += 0.4 * M * sec; p.x += p.vx * sec; p.dz -= 0.8 * M * sec; });
       S.smoke = S.smoke.filter(p => p.t < 0.5);
       if (!S.started || !S.alive) return;
-      const top = MAX_SPEED * Math.min(1, 0.5 + S.cuadras * 0.008);
+      // Sin techo (pedido del dueño): hasta los 140 km/h sube rápido y después sigue subiendo a la mitad de ritmo,
+      // ~195 km/h a las 160 cuadras y ~245 a las 250. Imposible para un Fitito, pero así la partida termina.
+      const f = 0.5 + S.cuadras * 0.008;
+      const top = MAX_SPEED * (f <= 1 ? f : 1 + (f - 1) * 0.5);
       S.speed = Math.min(top, S.speed + MAX_SPEED * 0.35 * sec);
       S.pos += S.speed * sec;
       // el auto va al centro de su carril en un instante (cambio de carril de ~0,12 s)
@@ -241,10 +248,12 @@ export default {
       for (const tl of tolls) {
         if (!tl.warned && tl.z - pz < 0.45 * KM) {
           tl.warned = true;
-          flash(toast, `Peaje: el carril ${['izquierdo', 'del medio', 'derecho'][tl.lane]} es MANUAL, ¡barrera baja!`);
+          const name = l => ['izquierdo', 'del medio', 'derecho'][l];
+          const open = [0, 1, 2].filter(l => !tl.closed.includes(l));
+          flash(toast, tl.closed.length === 1 ? `Peaje: el carril ${name(tl.closed[0])} es MANUAL, ¡barrera baja!` : `Peaje: ¡solo pasa el carril ${name(open[0])}!`);
           audio.tone(660, 0.12, 'square', 0.08); audio.tone(660, 0.12, 'square', 0.08, 0.2);
         }
-        if (tl.z - 0.4 * M < pz + 3.3 * M && tl.z > pz && Math.abs(laneX(tl.lane) - S.x) < (2 / 3 * 0.92 + CAR_W) / 2 * 0.8) return die('peaje');
+        if (tl.z - 0.4 * M < pz + 3.3 * M && tl.z > pz && tl.closed.some(l => Math.abs(laneX(l) - S.x) < (2 / 3 * 0.92 + CAR_W) / 2 * 0.8)) return die('peaje');
       }
     }
 
@@ -503,8 +512,8 @@ export default {
         case 'peaje': {
           // Peaje como los de la Panamericana: techo de hormigón, un cartel verde con su luz sobre cada carril,
           // isletas con casilla y frente a rayas rojas y blancas, y una barrera por carril.
-          // En un carril (al azar) la barrera está baja: si pasás por ahí, chocás.
-          const cl = it.toll.lane, conc = { front: '#cfccc4', side: '#a9a69e', top: '#e0ddd5' };
+          // En uno o dos carriles (al azar) la barrera está baja: si pasás por ahí, chocás.
+          const cl = it.toll.closed, conc = { front: '#cfccc4', side: '#a9a69e', top: '#e0ddd5' };
           const islands = [-1.06 * ROAD, -ROAD / 3, ROAD / 3, 1.06 * ROAD];
           const stripes = (rect, w) => {                     // franjas rojas y blancas en diagonal sobre un frente
             if (!rect) return;
@@ -531,7 +540,7 @@ export default {
           // techo de hormigón y carteles por carril
           box(-1.45 * ROAD, 1.45 * ROAD, 4.9 * M, 6.0 * M, z, z + 1.6 * M, conc);
           [0, 1, 2].forEach(l => {
-            const xc = laneX(l) * ROAD, hw = ROAD / 3 * 0.8, closed = l === cl;
+            const xc = laneX(l) * ROAD, hw = ROAD / 3 * 0.8, closed = cl.includes(l);
             // el carril con la barrera baja es el MANUAL (cartel naranja), como en los peajes de verdad
             const sign = box(xc - hw, xc + hw, 5.05 * M, 5.85 * M, z - 0.06 * M, z, closed
               ? { front: '#e8741c', side: '#b95a12', top: '#f08c3a' } : { front: '#1f8a4c', side: '#166638', top: '#2a9d5b' });
