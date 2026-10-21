@@ -3,8 +3,9 @@ import { assetUrl, getCustom } from '../js/art.js';
 
 // Imágenes de vehículos del dueño (de costado, vistos desde arriba, mirando a la derecha). Los de la mano
 // contraria se espejan. Los que no tienen imagen se dibujan con cajas en código.
-// (la primera imagen del taxi se veía demasiado de costado: hace falta una con la cámara más alta)
-const AUTO_IMG = {};
+// (la primera imagen del taxi se veía demasiado de costado; la segunda, con la cámara más alta, anda bien)
+const AUTO_IMG = { taxi: 'autoTaxi' };
+const IMG_STRETCH = 1.0;                 // estirón de alto de las imágenes (la vieja, más de costado, necesitaba 1,35)
 
 // Profundidad que ocupa un vehículo dentro de su carril (antes 0,17 a 0,83: se veían muy anchos)
 const HALF_LO = 0.25, HALF_HI = 0.75;
@@ -63,9 +64,9 @@ import { loadModel, renderOblique, renderWorld } from '../js/model3d.js';
 // Modelos 3D del dueño (assets/modelos/). up y front: cómo viene orientado cada archivo.
 // Los que no tienen modelo se dibujan con cajas en código.
 // Pasarlos antes por `node tools/glb-colores.mjs` (textura → colores por vértice: de 6,4 MB a 281 KB el taxi).
-const MODELS = {
-  taxi: { src: 'assets/modelos/taxi.glb', up: 'y', front: '-z' },   // taxi porteño negro y amarillo (IA, 11.600 triángulos)
-};
+// El taxi tiene modelo (assets/modelos/taxi.glb, up 'y', front '-z') pero se usa la imagen (AUTO_IMG), que se ve
+// más prolija: si un vehículo tiene imagen, el modelo no se usa, así que no se carga.
+const MODELS = {};
 
 // Pana Express: el frogger del delivery. Cruzás la Panamericana en bici, casillero por casillero,
 // y del otro lado viene otra, y otra: la ruta no termina. Puntos = metros recorridos, una sola vida.
@@ -378,7 +379,7 @@ export default {
       if (img) {
         // La imagen viene de una cámara un poco más baja que la del juego: se agranda apenas y se estira de alto
         // para que llene el carril como los demás. Las ruedas apoyan en el borde cercano del vehículo.
-        const w = len * cw * 1.14, h = w * img.height / img.width * 1.35;
+        const w = len * cw * 1.14, h = w * img.height / img.width * IMG_STRETCH;
         const [bx, by] = P(x, 0, z0 + 0.02);
         const cx = bx + len * cw / 2;
         ctx.fillStyle = 'rgba(0,0,0,.28)';

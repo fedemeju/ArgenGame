@@ -17,7 +17,27 @@ img.onload = () => {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'); g.drawImage(img, 0, 0);
   const id = g.getImageData(0, 0, w, h), d = id.data;
-  for (let i = 0; i < d.length; i += 4) {
+  if (q.get('fondo') === 'blanco') {
+    // &fondo=blanco: el fondo es el blanco/gris clarito que toca los bordes (relleno desde afuera, así no se comen
+    // los blancos del vehículo: faros, patente). El borde queda suave según qué tan claro es cada píxel.
+    const light = p => { const r = d[p * 4], gg = d[p * 4 + 1], b = d[p * 4 + 2]; return Math.min(r, gg, b) > 222 && Math.max(r, gg, b) - Math.min(r, gg, b) < 28; };
+    const bg = new Uint8Array(w * h), st = [];
+    for (let x = 0; x < w; x++) st.push(x, (h - 1) * w + x);
+    for (let y = 0; y < h; y++) st.push(y * w, y * w + w - 1);
+    while (st.length) {
+      const p = st.pop();
+      if (bg[p] || !light(p)) continue;
+      bg[p] = 1;
+      const x = p % w, y = (p / w) | 0;
+      if (x > 0) st.push(p - 1); if (x < w - 1) st.push(p + 1); if (y > 0) st.push(p - w); if (y < h - 1) st.push(p + w);
+    }
+    for (let p = 0; p < w * h; p++) {
+      if (bg[p]) { d[p * 4 + 3] = 0; continue; }
+      const x = p % w, y = (p / w) | 0;
+      const edge = (x > 0 && bg[p - 1]) || (x < w - 1 && bg[p + 1]) || (y > 0 && bg[p - w]) || (y < h - 1 && bg[p + w]);
+      if (edge) { const mn = Math.min(d[p * 4], d[p * 4 + 1], d[p * 4 + 2]); d[p * 4 + 3] = Math.round(255 * Math.max(0.25, Math.min(1, (250 - mn) / 70))); }
+    }
+  } else for (let i = 0; i < d.length; i += 4) {
     const r = d[i], gr = d[i + 1], b = d[i + 2];
     const m = Math.min(r - gr, b - gr);              // cuánto "magenta" tiene
     let a = 1 - (m - 10) / 50;
