@@ -4,7 +4,8 @@ import { assetUrl, getCustom } from '../js/art.js';
 // Imágenes de vehículos del dueño (de costado, vistos desde arriba, mirando a la derecha). Los de la mano
 // contraria se espejan. Los que no tienen imagen se dibujan con cajas en código.
 // (la primera imagen del taxi se veía demasiado de costado; la segunda, con la cámara más alta, anda bien)
-const AUTO_IMG = { taxi: 'autoTaxi' };
+const AUTO_IMG = { taxi: 'autoTaxi', colectivo: 'autoColectivo' };
+const MIRA_IZQ = new Set(['colectivo']);  // imágenes que vinieron con la trompa a la izquierda (se espejan al revés)
 const IMG_STRETCH = 1.0;                 // estirón de alto de las imágenes (la vieja, más de costado, necesitaba 1,35)
 
 // Profundidad que ocupa un vehículo dentro de su carril (antes 0,17 a 0,83: se veían muy anchos)
@@ -385,7 +386,7 @@ export default {
         ctx.fillStyle = 'rgba(0,0,0,.28)';
         ctx.beginPath(); ctx.ellipse(cx + cw * 0.06, by - h * 0.08, w * 0.5, h * 0.2, 0, 0, Math.PI * 2); ctx.fill();
         ctx.save();
-        if (d < 0) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
+        if ((d < 0) !== MIRA_IZQ.has(v.kind)) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
         ctx.drawImage(img, cx - w / 2, by - h, w, h);
         ctx.restore();
         return;
@@ -602,7 +603,7 @@ export default {
 
     return {
       destroy() { stop(); unbind(); clearTimeout(endTimer); st.destroy(); pill.remove(); toast.remove(); },
-      _state: S, _update: update, _move: () => move(0, 1), _step: move,
+      _state: S, _update: update, _draw: draw, _move: () => move(0, 1), _step: move,
       _hitAt: hitAt, _blocked: blocked, _lane: lane, _consts: { COLS, HOP_MS, SAFE_X, STUN_MS },
     };
   },

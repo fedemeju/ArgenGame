@@ -64,6 +64,7 @@ const FILES = {
   carpAgachado: 'assets/carpincho/agachado.png',
   teroVuela: 'assets/carpincho/tero.webp',
   autoTaxi: 'assets/autos/taxi.webp',          // Pana Express: de costado desde arriba, mirando a la derecha
+  autoColectivo: 'assets/autos/colectivo.webp', // Pana Express: de costado desde arriba, mirando a la IZQUIERDA
 };
 const custom = {};
 // Las imágenes llevan la misma versión que los módulos (la pone tools/version.mjs en el import map de index.html),

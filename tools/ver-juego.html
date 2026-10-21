@@ -25,6 +25,8 @@ window.__inst = inst; // para revisar desde la consola
 // &exportar=ms: pasado ese tiempo deja el lienzo como PNG en la página (PNG0:...:FIN), para leerlo con msedge --dump-dom
 // cuando la captura de pantalla sale vacía (pasa con Pana Express)
 if (q.get('exportar')) setTimeout(() => {
+  // dibuja un cuadro a mano: sin ventana, a veces el navegador casi no da cuadros y el lienzo queda vacío
+  if (inst._draw) inst._draw(16, performance.now());
   const cv = document.querySelector('#g canvas');
   document.getElementById('err').textContent = 'PNG0:' + cv.toDataURL('image/png') + ':FIN';
 }, Number(q.get('exportar')));
