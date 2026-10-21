@@ -62,8 +62,10 @@ import { loadModel, renderOblique, renderWorld } from '../js/model3d.js';
 
 // Modelos 3D del dueño (assets/modelos/). up y front: cómo viene orientado cada archivo.
 // Los que no tienen modelo se dibujan con cajas en código.
-// Ejemplo: taxi: { src: 'assets/modelos/taxi.glb', up: 'y', front: '+x' }
-const MODELS = {};
+// Pasarlos antes por `node tools/glb-colores.mjs` (textura → colores por vértice: de 6,4 MB a 281 KB el taxi).
+const MODELS = {
+  taxi: { src: 'assets/modelos/taxi.glb', up: 'y', front: '-z' },   // taxi porteño negro y amarillo (IA, 11.600 triángulos)
+};
 
 // Pana Express: el frogger del delivery. Cruzás la Panamericana en bici, casillero por casillero,
 // y del otro lado viene otra, y otra: la ruta no termina. Puntos = metros recorridos, una sola vida.
@@ -354,7 +356,13 @@ export default {
     // Imágenes de los modelos 3D, una por vehículo, sentido y tamaño de pantalla
     const models = {}, sprites = new Map();
     for (const [kind, m] of Object.entries(MODELS)) {
-      loadModel(assetUrl(m.src), m).then(model => { if (model) { models[kind] = model; sprites.clear(); } });
+      loadModel(assetUrl(m.src), m).then(model => { if (model) { models[kind] = model; sprites.clear(); prewarm(kind); } });
+    }
+    // Deja dibujados los dos sentidos apenas se sabe el tamaño de pantalla: hacerlo la primera vez que aparece
+    // el vehículo traba la partida un instante (el taxi tiene 11.600 triángulos: ~50 ms en la compu, más en el celular).
+    function prewarm(kind) {
+      if (!(cw > 1)) { setTimeout(() => prewarm(kind), 100); return; }
+      [1, -1].forEach((dir, i) => setTimeout(() => modelSprite(kind, dir, LEN[kind]), 30 + i * 60));
     }
     function modelSprite(kind, dir, len) {
       const model = models[kind];

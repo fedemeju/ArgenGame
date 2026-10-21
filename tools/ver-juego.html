@@ -7,6 +7,13 @@
      &accion=saltar|agachar  (se aprieta 6 pasos antes del final)   &propias=no  (sin imágenes de assets/) -->
 <style>body{margin:0;background:#222}#g{position:relative;width:100vw;height:100vh;overflow:hidden}</style>
 <div id="g"></div>
+<pre id="err" style="position:fixed;left:0;top:0;margin:0;color:#f66;font:12px monospace;white-space:pre-wrap"></pre>
+<script>
+  // los errores se muestran en pantalla: en la captura sin ventana no hay consola
+  const showErr = m => { document.getElementById('err').textContent += m + '\n'; };
+  addEventListener('error', e => showErr('ERROR ' + e.message + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno));
+  addEventListener('unhandledrejection', e => showErr('ERROR ' + (e.reason && e.reason.stack || e.reason)));
+</script>
 <script type="module">
 import { GAMES } from './games/index.js';
 import { loadCustomArt } from './js/art.js';
@@ -15,6 +22,20 @@ if (q.get('propias') !== 'no') { loadCustomArt(); await new Promise(r => setTime
 const game = GAMES[q.get('juego') || 'carpincho'];
 const inst = game.mount(document.getElementById('g'), { seed: Number(q.get('seed') || 3), onScore() {}, onEnd() {} });
 window.__inst = inst; // para revisar desde la consola
+// &exportar=ms: pasado ese tiempo deja el lienzo como PNG en la página (PNG0:...:FIN), para leerlo con msedge --dump-dom
+// cuando la captura de pantalla sale vacía (pasa con Pana Express)
+if (q.get('exportar')) setTimeout(() => {
+  const cv = document.querySelector('#g canvas');
+  document.getElementById('err').textContent = 'PNG0:' + cv.toDataURL('image/png') + ':FIN';
+}, Number(q.get('exportar')));
+// &diag=1: al segundo y medio anota cuántos cuadros se dibujaron y el color del centro del lienzo
+if (q.get('diag')) {
+  let frames = 0; const tick = () => { frames++; requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+  setTimeout(() => {
+    const cv = document.querySelector('#g canvas'), px = cv ? cv.getContext('2d').getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data : [];
+    showErr(`DIAG cuadros=${frames} lienzo=${cv ? cv.width + 'x' + cv.height : 'no'} centro=${[...px].join(',')}`);
+  }, 1500);
+}
 const steps = Number(q.get('pasos') || 0), acc = q.get('accion');
 if (steps) {
   if (inst._press) inst._press('jump', false); else inst._move(0);
