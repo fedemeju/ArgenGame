@@ -52,14 +52,14 @@ export default {
   id: 'fitito',
   name: 'El Fitito en la Panamericana',
   tagline: 'Esquivá el tráfico y los baches',
-  threshold: 3,
+  threshold: 300,
   rules: [
     'Manejás un Fiat 600 atado con alambre por la Panamericana. Acelera solo.',
     'Hay 3 carriles. Tocá el lado izquierdo o derecho de la pantalla: cada toque te mueve un carril.',
     'Vienen autos y camiones de frente, a veces dos juntos: siempre queda un carril libre.',
     'Hay bruma: el tráfico aparece de golpe, así que atento.',
     'Los baches gigantes te vuelan la suspensión.',
-    'Cada cuadra recorrida suma 1 punto. Cuanto más lejos, más rápido.',
+    'Cada metro recorrido suma 1 punto. Cuanto más lejos, más rápido.',
   ],
   icon(c, s) {
     const g = c.createLinearGradient(0, 0, 0, s);
@@ -118,7 +118,7 @@ export default {
 
     const S = {
       pos: 0, speed: 0, lane: 1, x: 0, started: false, alive: true,
-      obstacles: [], shake: 0, crash: null, cuadras: 0, smoke: [], smokeT: 0, sinceBache: 5, laneLast: [0, 0, 0],
+      obstacles: [], shake: 0, crash: null, cuadras: 0, metros: 0, smoke: [], smokeT: 0, sinceBache: 5, laneLast: [0, 0, 0],
     };
     let endTimer = 0;
     const PLAYER_Z = CAM_H * DEPTH;
@@ -131,7 +131,8 @@ export default {
     const CAR_V = MAX_SPEED * 0.1;
     const SEC = 8 * M;
     const laneX = l => -1 + (2 * l + 1) / LANES;
-    const report = () => onScore(S.cuadras, `Cuadras · ${Math.round(S.speed / MAX_SPEED * 140)} km/h`);
+    // Puntos = metros recorridos (pedido del dueño), con la misma medida que los mojones de la ruta (1 km = KM unidades)
+    const report = () => onScore(S.metros, `Metros · ${Math.round(S.speed / MAX_SPEED * 140)} km/h`);
     // Largo que ocupa cada cosa sobre la ruta (desde su frente). El Fitito ocupa de pz a pz + 3,3 m.
     const span = o => (o.kind === 'camion' ? [0, 14 * M] : o.kind === 'bache' ? [-0.8 * M, 3.4 * M] : [0, 4.3 * M]);
     const arrival = (oz, ov) => (oz - (S.pos + PLAYER_Z)) / Math.max(1, S.speed + ov);
@@ -205,7 +206,7 @@ export default {
       audio.lose(); buzz(kind === 'bache' ? [80, 40, 120] : [60, 40, 90]);
       report();
       const title = { bache: '¡Volaste la suspensión!', camion: '¡Te comiste un camión!', peaje: '¡Te llevaste puesta la barrera del peaje!' }[kind] || '¡Choque de frente!';
-      endTimer = setTimeout(() => onEnd(S.cuadras, { title }), 1100);
+      endTimer = setTimeout(() => onEnd(S.metros, { title }), 1100);
     }
 
     function update(dt) {
@@ -226,11 +227,10 @@ export default {
       S.smokeT -= sec;
       if (S.smokeT <= 0) { S.smokeT = 0.07; S.smoke.push({ x: S.x * ROAD - 0.45 * M, y: 0.3 * M, dz: -0.2 * M, vx: (Math.random() - 0.5) * M, t: 0 }); } // dz: atrás del auto
 
-      const c = Math.floor(S.pos / CUADRA);
-      if (c !== S.cuadras) {
-        S.cuadras = c;
-        if (c > 0 && c % 25 === 0) { flash(toast, `¡${c} cuadras!`); audio.win(); }
-      }
+      S.cuadras = Math.floor(S.pos / CUADRA);   // la dificultad (velocidad y tráfico) sigue yendo por cuadras
+      const m = Math.floor(S.pos / (KM / 1000));
+      if (Math.floor(m / 2000) > Math.floor(S.metros / 2000)) { flash(toast, `¡${Math.floor(m / 1000)} km!`); audio.win(); }
+      S.metros = m;
       report();
 
       S.secZ -= CAR_V * sec;
