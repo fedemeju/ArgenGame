@@ -4,8 +4,17 @@ import { assetUrl, getCustom } from '../js/art.js';
 // Imágenes de vehículos del dueño (de costado, vistos desde arriba, mirando a la derecha). Los de la mano
 // contraria se espejan. Los que no tienen imagen se dibujan con cajas en código.
 // (la primera imagen del taxi se veía demasiado de costado; la segunda, con la cámara más alta, anda bien)
-const AUTO_IMG = { taxi: 'autoTaxi', colectivo: 'autoColectivo' };
-const MIRA_IZQ = new Set(['colectivo']);  // imágenes que vinieron con la trompa a la izquierda (se espejan al revés)
+// Puede haber varias imágenes por tipo: cada vehículo elige una por su número de línea (siempre la misma).
+const AUTO_IMG = { taxi: ['autoTaxi'], colectivo: ['autoColectivo', 'autoColectivo152'] };
+const MIRA_IZQ = new Set(['autoColectivo']);  // imágenes que vinieron con la trompa a la izquierda (se espejan al revés)
+function autoImg(v) {
+  const keys = AUTO_IMG[v.kind];
+  if (!keys) return null;
+  const loaded = keys.filter(k => getCustom(k));
+  if (!loaded.length) return null;
+  const key = loaded[(parseInt(v.linea, 10) || 0) % loaded.length];
+  return { img: getCustom(key), izq: MIRA_IZQ.has(key) };
+}
 const IMG_STRETCH = 1.0;                 // estirón de alto de las imágenes (la vieja, más de costado, necesitaba 1,35)
 
 // Profundidad que ocupa un vehículo dentro de su carril (antes 0,17 a 0,83: se veían muy anchos)
@@ -376,17 +385,17 @@ export default {
 
     function vehicle3d(v, x, r) {
       const len = v.len, d = v.dir, z0 = r + HALF_LO, z1 = r + HALF_HI;
-      const img = AUTO_IMG[v.kind] && getCustom(AUTO_IMG[v.kind]);
-      if (img) {
-        // La imagen viene de una cámara un poco más baja que la del juego: se agranda apenas y se estira de alto
-        // para que llene el carril como los demás. Las ruedas apoyan en el borde cercano del vehículo.
-        const w = len * cw * 1.14, h = w * img.height / img.width * IMG_STRETCH;
+      const ai = autoImg(v);
+      if (ai) {
+        // La imagen se agranda apenas para que llene el carril como los demás. Las ruedas apoyan en el borde
+        // cercano del vehículo.
+        const img = ai.img, w = len * cw * 1.14, h = w * img.height / img.width * IMG_STRETCH;
         const [bx, by] = P(x, 0, z0 + 0.02);
         const cx = bx + len * cw / 2;
         ctx.fillStyle = 'rgba(0,0,0,.28)';
         ctx.beginPath(); ctx.ellipse(cx + cw * 0.06, by - h * 0.08, w * 0.5, h * 0.2, 0, 0, Math.PI * 2); ctx.fill();
         ctx.save();
-        if ((d < 0) !== MIRA_IZQ.has(v.kind)) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
+        if ((d < 0) !== ai.izq) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
         ctx.drawImage(img, cx - w / 2, by - h, w, h);
         ctx.restore();
         return;
